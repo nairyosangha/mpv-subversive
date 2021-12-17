@@ -163,7 +163,7 @@ function loader.search_subs(mal_id, mapping)
 	mp.osd_message("no suitable matches found")
 end
 
-function loader.find_mal_id(show_name, episode)
+function loader.query_mal(show_name, episode)
 	local cached_path = loader.get_cached_path(show_name, episode)
 	if util.path_exists(cached_path) then
 		return loader.show_matching_subs(cached_path)
@@ -188,7 +188,7 @@ function loader.main(subtitle_mapping_file)
 			loader.show_matching_subs(subtitle_dir)
 		end
 	end
-	local shows = loader.find_mal_id(show_name, episode)
+	local shows = loader.query_mal(show_name, episode)
 	if shows then
 		loader.build_show_menu(shows, show_subs)
 	end
