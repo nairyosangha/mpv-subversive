@@ -21,3 +21,11 @@ end
 function regex:groups()
 	return table.unpack(self.matches)
 end
+
+function regex:count_capture_groups()
+	local sum = 0
+	for _ in string.gmatch(self.pattern, "%(..-[^%%]%)") do
+		sum = sum + 1
+	end
+	return sum
+end
