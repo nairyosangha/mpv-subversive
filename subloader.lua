@@ -2,6 +2,7 @@ local loader = {}
 require 'sequence'
 require 'regex'
 local mp = require 'mp'
+local mpu = require 'mp.utils'
 local menu = require 'menu'
 local util = require 'utils'
 local archive = require 'archive'
@@ -119,8 +120,7 @@ function loader.extract_subs(file, episode_number, show_name)
 				:extract { filter = extensions, target_path = cached_path }
 			os.remove(full_path)
 		end)
-	return cached_path
-end
+	return cached_path end
 
 function loader.show_matching_subs(path)
 	local matched_subs = Sequence(util.run_cmd(string.format("ls %q", path)))
@@ -131,18 +131,36 @@ function loader.show_matching_subs(path)
 		return
 	end
 	menu_selector.items = matched_subs.items
+	menu_selector.last_selected = nil -- store sid of active sub here
+
+	function menu_selector:update_sub()
+		if self.last_selected then
+			mp.commandv("sub_remove", self.last_selected)
+		end
+		mp.commandv("sub_add", self.items[self.selected], 'cached', 'autoloader', 'jp')
+		self.last_selected = mp.get_property('sid')
+	end
 	function menu_selector:up()
 		menu.up(menu_selector)
-		mp.commandv("sub_add", self.items[self.selected], 'cached', 'autoloader', 'jp')
-	end
+		self:update_sub() end
 	function menu_selector:down()
 		menu.down(menu_selector)
-		mp.commandv("sub_add", self.items[self.selected], 'cached', 'autoloader', 'jp')
+		self:update_sub()
 	end
 	function menu_selector:act()
-		mp.osd_message(string.format("chose: %s", self.items[self.selected]))
+		local selected_sub = self.items[self.selected]
+		local _, selected_sub_file = mpu.split_path(selected_sub)
+		mp.osd_message(string.format("chose: %s", selected_sub_file))
+		local dir, fn = mpu.split_path(mp.get_property("filename/no-ext"))
+		local subs_path = string.format(dir .. "/subs/")
+		if not util.path_exists(subs_path) then
+			os.execute(string.format("mkdir %q", subs_path))
+		end
+		local sub_fn = table.concat({ subs_path, fn, ".", util.get_extension(selected_sub) })
+		os.execute(string.format("cp %q %q", selected_sub, sub_fn))
 		self:close()
 	end
+	menu_selector:update_sub()
 	menu_selector:open()
 	return nil
 end
