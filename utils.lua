@@ -1,6 +1,6 @@
 local utils = {}
 function utils.get_extension(filename)
-	return filename:match("%.([%a]+)$")
+	return filename:match("^.+%.([%a]+)$")
 end
 
 function utils.path_exists(path)
