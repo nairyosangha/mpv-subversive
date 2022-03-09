@@ -39,14 +39,20 @@ function menu_selector:close()
 end
 
 local function sanitize(text)
-	return text
-		:gsub("%.[%a]+$", "") -- extension
-		:gsub("_", " "):gsub("%.", " ")
-		:gsub("%[[^%]]+%]", "") -- [] bracket
-		:gsub("%([^%)]+%)", "") -- () bracket
-		:gsub("720[pP]", ""):gsub("480[pP]", ""):gsub("1080[pP]", "")
-		:gsub("[xX]26[45]", ""):gsub("[bB]lu[-]?[rR]ay", "")
-		:gsub("^[%s]*", ""):gsub("[%s]*$", "")
+    local sub_patterns = {
+		"%.[%a]+$", -- extension
+		"_", "%.",
+		"%[[^%]]+%]", -- [] bracket
+		"%([^%)]+%)", -- () bracket
+		"720[pP]", "480[pP]", "1080[pP]", "[xX]26[45]", "[bB]lu[-]?[rR]ay", "^[%s]*", "[%s]*$",
+        "1920x1080", "1920X1080", "Hi10P", "FLAC", "AAC"
+    }
+    local result = text
+    for _,sub_pattern in ipairs(sub_patterns) do
+        local new = result:gsub(sub_pattern, "")
+        if #new > 0 then result = new end
+    end
+    return result
 end
 
 local function extract_title_and_number(text)
