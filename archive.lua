@@ -34,9 +34,20 @@ function RAR:list_files(args)
 	return utils.iterate_cmd(cmd)
 end
 
+-- [] are expanded as pattern in unzip command, to 'escape' them '[' is replaced with '[[]'
+function ZIP:replace_left_brackets(filter)
+	if filter == nil then return nil end
+	local replaced = {}
+	for _,v in ipairs(filter) do
+		local v_replaced, count = string.gsub(v, "%[", "[[]")
+		replaced[#replaced+1] = v_replaced
+	end
+	return replaced
+end
+
 function ZIP:extract(args)
 	local cmd_str = 'unzip -jo %q %s -d %q'
-	local cmd = cmd_str:format(self.path, self:build_filter(args.filter), args.target_path or ".")
+	local cmd = cmd_str:format(self.path, self:build_filter(self:replace_left_brackets(args.filter)), args.target_path or ".")
 	return utils.iterate_cmd(cmd)
 end
 
