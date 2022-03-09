@@ -90,7 +90,7 @@ end
 function loader.extract_subs(file, episode_number, show_name)
 	local cached_path = loader.get_cached_path(show_name, episode_number)
 	local ep = (episode_number and string.format("*%s*", episode_number) or "*") .. ".%s"
-	local extensions = Sequence { "srt", "ass", "ssa", "pgs", "sup" }:map(function(ext) return ep:format(ext) end).items
+	local extensions = Sequence { "srt", "ass", "ssa", "pgs", "sup", "sub", "idx" }:map(function(ext) return ep:format(ext) end).items
 
 	local function extract_inner_archive(path_to_archive)
 		print(string.format("Looking for archive files in: %q", path_to_archive))
