@@ -36,8 +36,7 @@ end
 
 function utils.strip_path(path)
 	local stripped = string.match(path, "^.*/([^/]+)$")
-	print(stripped)
-	return stripped
+	return stripped or path
 end
 
 function utils.dir_name(path)

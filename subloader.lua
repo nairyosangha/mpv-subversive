@@ -106,7 +106,7 @@ function loader.extract_subs(file, episode_number, show_name)
 			archive
 				:new(path_to_archive)
 				:extract { filter = { arch }, target_path = cached_path }
-			-- lookup in archive has full path, so strip it
+			-- lookup in archive can have full path, so strip it
 			local a_path = string.format("%s/%s", cached_path, util.strip_path(arch))
 			extract_inner_archive(a_path)
 		end
