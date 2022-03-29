@@ -187,12 +187,7 @@ function loader.search_subs(mal_id, mapping)
 	mp.osd_message("no suitable matches found")
 end
 
-function loader.query_mal(show_name, episode)
-	local cached_path = loader.get_cached_path(show_name, episode)
-	if util.path_exists(cached_path) then
-		return loader.show_matching_subs(cached_path)
-	end
-
+function loader.query_mal(show_name)
 	local mal_cmd = string.format("python3 %q/query_mal.py '%q'", mp.get_script_directory(), show_name)
 	local results = Sequence(util.run_cmd(mal_cmd))
 		:map(function(res)
@@ -212,7 +207,21 @@ function loader.main(subtitle_mapping_file)
 			loader.show_matching_subs(subtitle_dir)
 		end
 	end
-	local shows = loader.query_mal(show_name, episode)
+
+    -- check whether we already extracted subs for this show / episode
+	local cached_path = loader.get_cached_path(show_name, episode)
+	if util.path_exists(cached_path) then
+		return loader.show_matching_subs(cached_path)
+	end
+
+    local f = io.open("./.mal_id", 'r')
+    if f then
+        local mal_id = f:lines("*l")()
+        f:close()
+        return show_subs(mal_id)
+    end
+
+	local shows = loader.query_mal(show_name)
 	if shows then
 		loader.build_show_menu(shows, show_subs)
 	end
