@@ -166,8 +166,8 @@ function loader.show_matching_subs(path)
 		os.execute(string.format("cp %q %q", selected_sub, sub_fn))
 		self:close()
 	end
-	menu_selector:update_sub()
 	menu_selector:open()
+	menu_selector:update_sub()
 	return nil
 end
 
@@ -211,12 +211,14 @@ function loader.main(subtitle_mapping_file)
     -- check whether we already extracted subs for this show / episode
 	local cached_path = loader.get_cached_path(show_name, episode)
 	if util.path_exists(cached_path) then
+        print("loading cached path: " .. cached_path)
 		return loader.show_matching_subs(cached_path)
 	end
 
     local f = io.open("./.mal_id", 'r')
     if f then
         local mal_id = f:lines("*l")()
+        print(string.format("Read id %d from ./.mal_id", mal_id))
         f:close()
         return show_subs(mal_id)
     end
