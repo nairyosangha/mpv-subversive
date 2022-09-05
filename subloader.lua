@@ -1,10 +1,10 @@
 local loader = {}
-require 'sequence'
+require 'utils/sequence'
 require 'regex'
 local mp = require 'mp'
 local mpu = require 'mp.utils'
 local menu = require 'menu'
-local util = require 'utils'
+local util = require 'utils/utils'
 local archive = require 'archive'
 
 -- default menu which can be used for the different selection views
@@ -77,7 +77,7 @@ end
 
 function loader.build_show_menu(show_list, on_action)
     local titles = Sequence(show_list):map(function(x) return x.title end)
-    menu_selector.items = titles.items
+    menu_selector.items = titles:collect()
     function menu_selector:act()
         self:close()
         on_action(show_list[self.selected].id)
@@ -96,7 +96,7 @@ end
 function loader.extract_subs(file, episode_number, show_name)
     local cached_path = loader.get_cached_path(show_name, episode_number)
     local ep = (episode_number and string.format("*%s*", episode_number) or "*") .. ".%s"
-    local extensions = Sequence { "srt", "ass", "ssa", "pgs", "sup", "sub", "idx" }:map(function(ext) return ep:format(ext) end).items
+    local extensions = Sequence { "srt", "ass", "ssa", "pgs", "sup", "sub", "idx" }:map(function(ext) return ep:format(ext) end):collect()
 
     local function extract_inner_archive(path_to_archive)
         print(string.format("Looking for archive files in: %q", path_to_archive))
@@ -136,7 +136,7 @@ function loader.show_matching_subs(path)
         mp.osd_message("no matching subs")
         return
     end
-    menu_selector.items = matched_subs.items
+    menu_selector.items = matched_subs:collect()
     menu_selector.last_selected = nil -- store sid of active sub here
 
     function menu_selector:update_sub()

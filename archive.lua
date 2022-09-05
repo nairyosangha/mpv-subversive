@@ -1,4 +1,4 @@
-local utils = require 'utils'
+local utils = require 'utils/utils'
 
 local archive = {}
 local archive_mt = { __index = archive }
