@@ -128,8 +128,16 @@ function loader.extract_subs(file, episode_number, show_name)
         end)
     return cached_path end
 
-function loader.show_matching_subs(path)
+function loader.show_matching_subs(path, episode_number)
+    -- when extracting subs only ep number is checked, which can return wrong matches
+    local function matching_ep(filename)
+        local msg = "Looking for episode %d in '%s' (sanitized: '%s')"
+        local sanitized = sanitize(filename)
+        print(msg:format(episode_number, filename, sanitized))
+        return sanitized and sanitized:find(episode_number)
+    end
     local matched_subs = Sequence(util.run_cmd(string.format("ls %q", path)))
+        :filter(matching_ep)
         :map(function(sub)
             return string.format("%s/%s", path, sub) end)
     if matched_subs.size == 0 then
@@ -205,7 +213,7 @@ function loader.main(subtitle_mapping_file)
         local subtitle_archive = loader.search_subs(mal_id, subtitle_mapping_file)
         if subtitle_archive then
             local subtitle_dir = loader.extract_subs(subtitle_archive, episode, show_name)
-            loader.show_matching_subs(subtitle_dir)
+            loader.show_matching_subs(subtitle_dir, episode)
         end
     end
 
@@ -213,7 +221,7 @@ function loader.main(subtitle_mapping_file)
     local cached_path = loader.get_cached_path(show_name, episode)
     if util.path_exists(cached_path) then
         print("loading cached path: " .. cached_path)
-        return loader.show_matching_subs(cached_path)
+        return loader.show_matching_subs(cached_path, episode)
     end
 
     local f = io.open("./.mal_id", 'r')
