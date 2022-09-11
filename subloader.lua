@@ -140,11 +140,12 @@ function loader.show_matching_subs(path, episode_number)
         :filter(matching_ep)
         :map(function(sub)
             return string.format("%s/%s", path, sub) end)
-    if matched_subs.size == 0 then
+        :collect()
+    if #matched_subs == 0 then
         mp.osd_message("no matching subs")
         return
     end
-    menu_selector.items = matched_subs:collect()
+    menu_selector.items = matched_subs
     menu_selector.last_selected = nil -- store sid of active sub here
 
     function menu_selector:update_sub()
@@ -202,7 +203,7 @@ function loader.query_mal(show_name)
         :map(function(res)
             local id, name = string.match(res, "^([%d]+),(.+)$")
             return { title = name, id = id } end)
-    return results.items
+    return results:collect()
 end
 
 function loader.main(subtitle_mapping_file)
