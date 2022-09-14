@@ -7,7 +7,7 @@ local RAR = setmetatable({}, archive_mt)
 local mapper = { ZIP = ZIP, RAR = RAR }
 
 function archive:new(file_path)
-	assert(utils.path_exists(file_path), "INVALID PATH!")
+	assert(utils.path_exists(file_path), string.format("INVALID PATH '%s'!", file_path))
 	self.ext = utils.get_extension(file_path) or ""
 	self.path = file_path
 	return setmetatable({}, { __index = mapper[self.ext:upper()] or self })

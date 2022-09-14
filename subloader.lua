@@ -187,8 +187,8 @@ function loader.search_subs(mal_id, mapping)
     local f = io.open(mapping, 'r')
     for entry in f:lines("*l") do
         local id, path = string.match(entry, "^([%d]+);\"(.+)\"$")
-        assert(util.path_exists(path), string.format("INVALID PATH: %q", path))
         if id == mal_id then
+            assert(util.path_exists(path), string.format("INVALID PATH: %q", path))
             f:close()
             return path
         end
