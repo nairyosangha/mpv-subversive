@@ -59,12 +59,13 @@ local function extract_title_and_number(text)
     local matchers = Sequence {
         Regex("^([%a%s%p%d]+)[Ss][%d]+[Ee]?([%d]+)", "\1\2"),
         Regex("^([%a%s%p%d]+)%-[%s]-([%d]+)[%s%p]*[^%a]*", "\1\2"),
-        Regex("^([%a%s%p%d][%a%s%p]-)[Ee]?[Pp]?[%s]-(%d+)[^%a].*$", "\1\2"),
+        Regex("^([%a%s%p%d]+)[Ee]?[Pp]?[%s]+(%d+)$", "\1\2"),
         Regex("^([%a%s%p%d]+)[%s](%d+).*$", "\1\2"),
         Regex("^([%d]+)[%s]*(.+)$", "\2\1") }
     local _, re = matchers:find_first(function(re) return re:match(text) end)
     if re then
-        return re:groups()
+        local title, ep_number = re:groups()
+        return title, tonumber(ep_number)
     end
     return text
 end
