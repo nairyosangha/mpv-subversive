@@ -137,10 +137,12 @@ function loader.show_matching_subs(path, episode_number)
         print(msg:format(episode_number, filename, sanitized))
         return sanitized and sanitized:find(episode_number)
     end
+    local function to_full_path(subtitle)
+        return string.format("%s/%s", path, subtitle)
+    end
     local matched_subs = Sequence(util.run_cmd(string.format("ls %q", path)))
         :filter(matching_ep)
-        :map(function(sub)
-            return string.format("%s/%s", path, sub) end)
+        :map(to_full_path)
         :collect()
     if #matched_subs == 0 then
         mp.osd_message("no matching subs")
