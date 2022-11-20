@@ -34,6 +34,16 @@ function RAR:list_files(args)
 	return utils.iterate_cmd(cmd)
 end
 
+function ZIP:check_valid()
+	local return_code = os.execute(string.format("zip -T %q", self.path))
+	return return_code == 0
+end
+
+function RAR:check_valid()
+	local return_code = os.execute(string.format("rar t %q", self.path))
+	return return_code == 0
+end
+
 -- [] are expanded as pattern in unzip command, to 'escape' them '[' is replaced with '[[]'
 function ZIP:replace_left_brackets(filter)
 	if filter == nil then return nil end

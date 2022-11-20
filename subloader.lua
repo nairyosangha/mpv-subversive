@@ -102,6 +102,10 @@ function loader.extract_subs(file, episode_number, show_name)
     local function extract_inner_archive(path_to_archive)
         print(string.format("Looking for archive files in: %q", path_to_archive))
         local parser = archive:new(path_to_archive)
+        if not parser:check_valid() then
+            print(string.format("Archive was invalid! skipping..\n"))
+            return
+        end
         local archive_filter = { "*.zip", "*.rar" }
         for arch in parser:list_files { filter = archive_filter } do
             archive
