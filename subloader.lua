@@ -136,6 +136,9 @@ function loader.extract_subs(file, episode_number, show_name)
 function loader.show_matching_subs(path, episode_number)
     -- when extracting subs only ep number is checked, which can return wrong matches
     local function matching_ep(filename)
+        if episode_number == nil then
+            return true
+        end
         local msg = "Looking for episode %d in '%s' (sanitized: '%s')"
         local sanitized = sanitize(filename)
         print(msg:format(episode_number, filename, sanitized))
@@ -144,13 +147,18 @@ function loader.show_matching_subs(path, episode_number)
     local function to_full_path(subtitle)
         return string.format("%s/%s", path, subtitle)
     end
-    local matched_subs = Sequence(util.run_cmd(string.format("ls %q", path)))
+    local all_subs = util.run_cmd(string.format("ls %q", path))
+    local matched_subs = Sequence(all_subs)
         :filter(matching_ep)
         :map(to_full_path)
         :collect()
-    if #matched_subs == 0 then
+    if #all_subs == 0 then
         mp.osd_message("no matching subs")
         return
+    end
+    if #matched_subs == 0 then
+        -- if we had something initially but filter removed everything, the filter is probably wrong
+        matched_subs = Sequence(all_subs):map(to_full_path):collect()
     end
     menu_selector.items = matched_subs
     menu_selector.last_selected = nil -- store sid of active sub here
