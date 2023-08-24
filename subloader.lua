@@ -200,8 +200,10 @@ function loader.search_subs(mal_id, mapping)
     print(string.format("found MAL id: %d, looking for matches in %q", mal_id, mapping))
     assert(util.path_exists(mapping), "Mapping file does not exist!")
     local f = io.open(mapping, 'r')
+    local mapping_dir, _ = mpu.split_path(mapping)
     for entry in f:lines("*l") do
         local id, path = string.match(entry, "^([%d]+);\"(.+)\"$")
+        path = mapping_dir .. path
         if id == mal_id then
             assert(util.path_exists(path), string.format("INVALID PATH: %q", path))
             f:close()
