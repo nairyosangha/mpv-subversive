@@ -6,6 +6,17 @@ local ZIP = setmetatable({}, archive_mt)
 local RAR = setmetatable({}, archive_mt)
 local mapper = { ZIP = ZIP, RAR = RAR }
 
+-- execute command and return exit code
+local function execute(cmd)
+    if _VERSION == "Lua 5.1" then
+        return os.execute(cmd)
+    elseif _VERSION == "Lua 5.2" then
+        local success, exit, code = os.execute(cmd)
+        return exit == "exit" and code or 1
+    end
+    assert(true, ("Unsupported lua version: %s!"):format(_VERSION))
+end
+
 function archive:new(file_path)
 	assert(utils.path_exists(file_path), string.format("INVALID PATH '%s'!", file_path))
 	self.ext = utils.get_extension(file_path) or ""
@@ -35,13 +46,11 @@ function RAR:list_files(args)
 end
 
 function ZIP:check_valid()
-	local return_code = os.execute(string.format("zip -T %q", self.path))
-	return return_code == 0
+	return execute(string.format("zip -T %q", self.path)) == 0
 end
 
 function RAR:check_valid()
-	local return_code = os.execute(string.format("rar t %q", self.path))
-	return return_code == 0
+	return execute(string.format("rar t %q", self.path)) == 0
 end
 
 -- [] are expanded as pattern in unzip command, to 'escape' them '[' is replaced with '[[]'
