@@ -80,9 +80,7 @@ function backend:extract_archive(file, show_info)
         end
         local archive_filter = { "*.zip", "*.rar" }
         for arch in parser:list_files { filter = archive_filter } do
-            archive
-                :new(path_to_archive)
-                :extract { filter = { arch }, target_path = cached_path }
+            parser:extract { filter = { arch }, target_path = cached_path }
             -- lookup in archive can have full path, so strip it
             local a_path = string.format("%s/%s", cached_path, util.strip_path(arch))
             extract_inner_archive(a_path)
@@ -92,15 +90,21 @@ function backend:extract_archive(file, show_info)
     os.execute(string.format("mkdir -p %q", cached_path))
     extract_inner_archive(file)
 
-    os.execute(string.format("cp %q %q", file, cached_path))
+    --TODO copying should only be done in the offline flow
+    --os.execute(string.format("cp %q %q", file, cached_path))
     print(string.format("Extracting matches to: %q", cached_path))
-    Sequence(util.run_cmd(string.format("ls %q", cached_path)))
-        :map(function(zip)
-            return string.format("%s/%s", cached_path, zip) end)
+    Sequence(util.run_cmd(string.format("ls %q/*.{rar,zip}", cached_path)))
         :foreach(function(full_path)
-            archive
-                :new(full_path)
-                :extract { filter = extensions, target_path = cached_path }
+            local parser = archive:new(full_path)
+            if not parser:check_valid() then
+                os.remove(full_path)
+                return
+            end
+            for arch in parser:list_files { filter = extensions } do
+                if not show_info.ep_number or self.sanitize(arch):match(show_info.ep_number) then
+                    parser:extract { filter = { arch }, target_path = cached_path }
+                end
+            end
             os.remove(full_path)
         end)
     return cached_path
