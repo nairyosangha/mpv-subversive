@@ -2,6 +2,11 @@
 
 MPV plugin **for GNU/Linux** that makes it easy to find and load subtitles for the shows you're watching.
 
+
+https://github.com/nairyosangha/mpv-subversive/assets/34285115/dc5cf7ab-9d19-4dce-952d-af80fe563ca2
+
+
+
 This plugin depends on functionality provided by the [AniList API](https://anilist.gitbook.io/anilist-apiv2-docs/overview/graphql) and [Jimaku](https://jimaku.cc/).
 
 The code to display the GUI menu is largely borrowed from [autosubsync-mpv](https://github.com/joaquintorres/autosubsync-mpv)
