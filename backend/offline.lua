@@ -22,7 +22,7 @@ function offline:query_subtitles(mal_id, show_info)
         end
     end)
     if not path then
-        mpu.osd_message("no suitable matches found")
+        mpu.osd_message("no suitable matches found", 3)
         return nil
     end
 

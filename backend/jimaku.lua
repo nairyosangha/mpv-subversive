@@ -17,7 +17,7 @@ end
 ---@param show_info table containing title, ep_number and show ID
 ---@return string|nil path to directory containing all matching subs or nil if nothing was found
 function jimaku:query_subtitles(anilist_id, show_info)
-    mp.osd_message(("Finding matching subtitles for AniList ID '%s'"):format(anilist_id))
+    mp.osd_message(("Finding matching subtitles for AniList ID '%s'"):format(anilist_id), 3)
     local response = requests:GET {
         url = requests:build_url(self.BASE_URL, "entries/search", { anilist_id = anilist_id }),
         headers = {

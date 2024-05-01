@@ -59,7 +59,7 @@ function loader.show_matching_subs(path)
         :map(to_full_path)
         :collect()
     if #all_subs == 0 then
-        mp.osd_message("no matching subs")
+        mp.osd_message("no matching subs", 3)
         return
     end
     menu_selector.header = "Matching subtitles"
@@ -86,7 +86,7 @@ function loader.show_matching_subs(path)
     function menu_selector:act()
         local selected_sub = with_full_path[self.selected]
         local _, selected_sub_file = mpu.split_path(selected_sub)
-        mp.osd_message(string.format("chose: %s", selected_sub_file))
+        mp.osd_message(string.format("chose: %s", selected_sub_file), 2)
         local dir, fn = mpu.split_path(mp.get_property("filename/no-ext"))
         local subs_path = string.format(dir .. "/subs/")
         if not util.path_exists(subs_path) then
@@ -129,7 +129,7 @@ function loader:run(backend)
     function get_show_id()
         local matching_shows = backend:query_shows(show_info)
         if #matching_shows == 0 then
-            return mp.osd_message("Failed to query shows")
+            return mp.osd_message("Failed to query shows", 3)
         end
         self.build_show_menu(matching_shows, show_matching_subtitles)
     end
