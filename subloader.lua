@@ -47,7 +47,7 @@ end
 ---the backend needs to be inserted in the loader table before calling this function
 ---@param show_info table containing parsed_title, ep_number (anilist_data is filled in on success)
 ---@param on_action function which is called when the user confirms their selection
-function loader:build_manual_lookup_menu(show_info, on_action)
+function loader:build_manual_lookup_console(show_info, on_action)
     local function log_help()
         mpi.log("Manual lookup requested, Please start typing the name of the show.")
         mpi.log("When the correct entry pops up on screen, select it with TAB, and press ENTER.")
@@ -100,6 +100,25 @@ function loader:build_manual_lookup_menu(show_info, on_action)
     }
 end
 
+---Unlike the build_manual_lookup_console function, this first displays a GUI menu asking the user if they want to try a manual lookup.
+---@param show_info table containing parsed_title, ep_number (anilist_data is not filled in at this point)
+---@param on_action function which is called when the user confirms their selection
+function loader:build_manual_lookup_menu(show_info, on_action)
+    menu_selector.header = "No matching shows, try manual lookup?"
+    menu_selector.items = { "Yes", "No" }
+    menu_selector.act = function(self_menu)
+        self_menu:close()
+        if self_menu.selected == 2 then -- No
+            return mp.osd_message("No matching shows.", 3)
+        end
+        self:build_manual_lookup_console(show_info, on_action)
+    end
+    menu_selector:open()
+end
+
+---@param show_list table with all shows that match the automatically parsed filename
+---@param show_info table containing parsed_title, ep_number (anilist_data is not filled in at this point)
+---@param on_action function which is called when the user confirms their selection
 function loader:build_show_menu(show_list, show_info, on_action)
     menu_selector.header = "Select the correct show"
     menu_selector.items = Sequence(show_list):map(build_menu_entry):collect()
@@ -107,7 +126,7 @@ function loader:build_show_menu(show_list, show_info, on_action)
     function menu_selector:act()
         self:close()
         if self.selected == 1 then
-            return loader:build_manual_lookup_menu(show_info, on_action)
+            return loader:build_manual_lookup_console(show_info, on_action)
         end
         show_info.anilist_data = show_list[self.selected-1]
         on_action(show_info)
@@ -198,9 +217,10 @@ function loader:run(backend)
 
     -- show titles which match the parsed show title
     function get_show_id()
-        local matching_shows = backend:query_shows(initial_show_info)
+        -- only show at most 10 entries, if there are more we probably parsed the show name wrong, plus the list wouldn't render right anyway
+        local matching_shows = util.table_slice(backend:query_shows(initial_show_info), 1, 11)
         if #matching_shows == 0 then
-            return mp.osd_message("Failed to query shows", 3)
+            return self:build_manual_lookup_menu(initial_show_info, show_matching_subtitles)
         end
         self:build_show_menu(matching_shows, initial_show_info, show_matching_subtitles)
     end
