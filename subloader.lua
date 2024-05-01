@@ -7,7 +7,7 @@ local menu = require 'menu'
 local util = require 'utils/utils'
 
 -- default menu which can be used for the different selection views
-local menu_selector = menu:new { pos_x = 50, pos_y = 50, rect_with = 500 }
+local menu_selector = menu:new { pos_x = 50, pos_y = 50, rect_width = 500 }
 function menu_selector:get_keybindings()
     return {
         { key = 'h', fn = function() self:close() end },
@@ -54,18 +54,16 @@ function loader.show_matching_subs(path)
         return string.format("%s/%s", path, subtitle)
     end
     local all_subs = util.run_cmd(string.format("ls %q", path))
-    local matched_subs = Sequence(all_subs)
+    local with_full_path = Sequence(all_subs)
         :map(to_full_path)
         :collect()
     if #all_subs == 0 then
         mp.osd_message("no matching subs")
         return
     end
-    if #matched_subs == 0 then
-        -- if we had something initially but filter removed everything, the filter is probably wrong
-        matched_subs = Sequence(all_subs):map(to_full_path):collect()
-    end
-    menu_selector.items = matched_subs
+    menu_selector.rect_width = mp.get_property("osd-width") - 100
+    menu_selector.font_size = 20
+    menu_selector.items = all_subs
     menu_selector.last_selected = nil -- store sid of active sub here
 
     function menu_selector:update_sub()
@@ -73,7 +71,7 @@ function loader.show_matching_subs(path)
             mp.commandv("sub_remove", self.last_selected)
         end
 
-        mp.commandv("sub_add", self.items[self.selected], 'cached', 'autoloader', 'jp')
+        mp.commandv("sub_add", with_full_path[self.selected], 'cached', 'autoloader', 'jp')
         self.last_selected = mp.get_property('sid')
     end
     function menu_selector:up()
@@ -84,7 +82,7 @@ function loader.show_matching_subs(path)
         self:update_sub()
     end
     function menu_selector:act()
-        local selected_sub = self.items[self.selected]
+        local selected_sub = with_full_path[self.selected]
         local _, selected_sub_file = mpu.split_path(selected_sub)
         mp.osd_message(string.format("chose: %s", selected_sub_file))
         local dir, fn = mpu.split_path(mp.get_property("filename/no-ext"))

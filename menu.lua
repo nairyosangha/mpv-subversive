@@ -19,6 +19,7 @@ function Menu:new(o)
     o.inactive_color = o.inactive_color or 'aaaaaa'
     o.border_color = o.border_color or '000000'
     o.text_color = o.text_color or 'ffffff'
+    o.font_size = o.font_size or 25
 
     return setmetatable(o, self)
 end
@@ -28,8 +29,8 @@ function Menu:set_position(x, y)
     self.pos_y = y
 end
 
-function Menu:font_size(size)
-    self:append(string.format([[{\fs%s}]], size))
+function Menu:set_font_size()
+    self:append(string.format([[{\fs%s}]], self.font_size))
 end
 
 function Menu:set_text_color(code)
@@ -56,11 +57,10 @@ end
 
 function Menu:draw_text(i)
     local padding = 5
-    local font_size = 25
 
     self:new_event()
     self:pos(self.pos_x + padding, self.pos_y + self.rect_height * (i - 1) + padding)
-    self:font_size(font_size)
+    self:set_font_size()
     self:apply_text_color(i)
     self:append(self.items[i])
 end
