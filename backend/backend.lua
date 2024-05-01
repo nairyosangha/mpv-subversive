@@ -19,7 +19,7 @@ function backend:new(options)
 end
 
 ---Use AniList's search API to query the show name (parsed from the filename)
----@param show_info table containing title, ep_number and show ID
+---@param show_info table containing parsed_title, ep_number (anilist_data is not filled in at this point)
 ---@return table containing all shows which match the title
 function backend:query_shows(show_info)
     local graphql_query = [[
@@ -28,6 +28,9 @@ function backend:query_shows(show_info)
                 media (id: $id, search: $search, type: ANIME) {
                     id
                     episodes
+                    format
+                    startDate { year }
+                    endDate { year }
                     title {
                         english
                         romaji
@@ -40,7 +43,7 @@ function backend:query_shows(show_info)
     local body_json = mpu.format_json({
         query = graphql_query,
         variables = {
-            search = show_info.title
+            search = show_info.parsed_title
         }
     })
     local response = requests:POST {
@@ -54,21 +57,20 @@ function backend:query_shows(show_info)
 end
 
 ---Extract all subtitles which are available for the given ID
----@param id string which is used to identify the show
----@param show_info table containing title, ep_number and show ID
+---@param show_info table containing parsed_title, ep_number and anilist_data
 ---@return string path to directory containing all matching subs
-function backend:query_subtitles(id, show_info)
+function backend:query_subtitles(show_info)
     assert(false, "This should be implemented in a specific backend!")
 end
 
 --- Extract all subtitle files in the given archive and store them in predefined cache directory
 ---@param file string: filename which is a archive containing subtitles
----@param show_info table containing title, ep_number and show ID
+---@param show_info table containing title, ep_number and anilist_data
 ---@return string path where the extracted subtitles are stored
 function backend:extract_archive(file, show_info)
-    -- TODO we could be smarter here, we can check how many episodes is and add leading zeros to ep number (so we don't match ep 12 when looking for ep 2)
+    local ep_fmt = ("*%%0%dd*"):format(#tostring(show_info.anilist_data.episodes or "00"))
     local cached_path = self:get_cached_path(show_info)
-    local ep = (show_info.ep_number and ("*%s*"):format(show_info.ep_number) or "*") .. ".%s"
+    local ep = (show_info.ep_number and ep_fmt:format(show_info.ep_number) or "*") .. ".%s"
     local extensions = Sequence { "srt", "ass", "ssa", "pgs", "sup", "sub", "idx" }:map(function(ext) return ep:format(ext) end):collect()
 
     local function extract_inner_archive(path_to_archive)
@@ -112,9 +114,9 @@ end
 
 function backend:get_cached_path(show_info)
     if show_info.ep_number then
-        return string.format("%s/%s/%s", self.cache_directory, show_info.title, show_info.ep_number)
+        return string.format("%s/%s/%s", self.cache_directory, show_info.parsed_title, show_info.ep_number)
     end
-    return string.format("%s/%s", self.cache_directory, show_info.title)
+    return string.format("%s/%s", self.cache_directory, show_info.parsed_title)
 end
 
 function backend.sanitize(text)

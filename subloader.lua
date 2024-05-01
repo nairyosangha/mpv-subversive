@@ -37,12 +37,17 @@ function menu_selector:close()
     self:erase()
 end
 
-function loader.build_show_menu(show_list, on_action)
+function loader.build_show_menu(show_list, show_info, on_action)
     menu_selector.header = "Select the correct show"
-    menu_selector.items = Sequence(show_list):map(function(x) return x.title.romaji end):collect()
+    menu_selector.items = Sequence(show_list):map(function(x)
+        local start, end_ = x.startDate.year, x.endDate.year
+        local year_string = start == end_ and start or ("%s-%s"):format(start, end_)
+        return ("[%s]  %s  (%s)"):format(x.format, x.title.romaji, year_string)
+    end):collect()
     function menu_selector:act()
         self:close()
-        on_action(show_list[self.selected].id)
+        show_info.anilist_data = show_list[self.selected]
+        on_action(show_info)
     end
     menu_selector:open()
 end
@@ -103,16 +108,18 @@ end
 
 function loader:run(backend)
     local show_name, episode = backend:parse_current_file(mp.get_property("filename"))
-    local show_info = {
-        title = show_name,
+    local initial_show_info = {
+        parsed_title = show_name,
         ep_number = episode and tonumber(episode),
+        -- the following field gets filled in later after we query AniList
+        anilist_data = nil
     }
-    print(("show title: '%s', episode number: '%d'"):format(show_name, episode))
+    print(("show title: '%s', episode number: '%d'"):format(show_name, episode or -1))
 
     local show_matching_subtitles, get_show_id
 
     -- check whether we already extracted subs for this show / episode
-    local cached_path = backend:get_cached_path(show_info)
+    local cached_path = backend:get_cached_path(initial_show_info)
     if util.path_exists(cached_path) then
         print("loading cached path: " .. cached_path)
         return loader.show_matching_subs(cached_path)
@@ -127,15 +134,17 @@ function loader:run(backend)
 
     -- show titles which match the parsed show title
     function get_show_id()
-        local matching_shows = backend:query_shows(show_info)
+        local matching_shows = backend:query_shows(initial_show_info)
         if #matching_shows == 0 then
             return mp.osd_message("Failed to query shows", 3)
         end
-        self.build_show_menu(matching_shows, show_matching_subtitles)
+        self.build_show_menu(matching_shows, initial_show_info, show_matching_subtitles)
     end
 
-    function show_matching_subtitles(id)
-        local extracted_subs_path = backend:query_subtitles(id, show_info)
+    ---callback used after we've identified the correct show
+    ---@param show_info table containing parsed_title, ep_number and anilist_data
+    function show_matching_subtitles(show_info)
+        local extracted_subs_path = backend:query_subtitles(show_info)
         self.show_matching_subs(extracted_subs_path)
     end
 

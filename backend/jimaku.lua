@@ -1,3 +1,4 @@
+require 'utils.sequence'
 local requests = require 'requests'
 local mp = require 'mp'
 local mpu = require 'mp.utils'
@@ -13,10 +14,10 @@ local function is_archive(filename)
 end
 
 ---Extract all subtitles which are available for the given ID
----@param anilist_id string which is used to identify the show
----@param show_info table containing title, ep_number and show ID
+---@param show_info table containing title, ep_number and anilist_data
 ---@return string|nil path to directory containing all matching subs or nil if nothing was found
-function jimaku:query_subtitles(anilist_id, show_info)
+function jimaku:query_subtitles(show_info)
+    local anilist_id = show_info.anilist_data.id
     mp.osd_message(("Finding matching subtitles for AniList ID '%s'"):format(anilist_id), 3)
     local response = requests:GET {
         url = requests:build_url(self.BASE_URL, "entries/search", { anilist_id = anilist_id }),
@@ -32,7 +33,8 @@ function jimaku:query_subtitles(anilist_id, show_info)
             return true
         end
         local sanitized_filename = self.sanitize(file_entry.name)
-        local match = sanitized_filename:match(show_info.ep_number)
+        local zero_padded_ep_number = ("%%0%dd"):format(#tostring(show_info.anilist_data.episodes or "00")):format(show_info.ep_number)
+        local match = sanitized_filename:match(zero_padded_ep_number)
         if not match then
             print(("Discarding sub which didn't match ep_number %s (sanitized fn '%s')"):format(show_info.ep_number, sanitized_filename))
         end
