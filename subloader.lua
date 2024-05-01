@@ -7,7 +7,7 @@ local menu = require 'menu'
 local util = require 'utils/utils'
 
 -- default menu which can be used for the different selection views
-local menu_selector = menu:new { pos_x = 50, pos_y = 50 }
+local menu_selector = menu:new { pos_x = 50, pos_y = 50, rect_with = 500 }
 function menu_selector:get_keybindings()
     return {
         { key = 'h', fn = function() self:close() end },

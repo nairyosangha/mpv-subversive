@@ -4,7 +4,7 @@ local mpu = require 'mp.utils'
 local utils = require 'utils.utils'
 
 local jimaku = {
-	BASE_URL = "https://jimaku.cc/api/"
+    BASE_URL = "https://jimaku.cc/api/"
 }
 
 local function is_archive(filename)
@@ -21,8 +21,8 @@ function jimaku:query_subtitles(anilist_id, show_info)
     local response = requests:GET {
         url = requests:build_url(self.BASE_URL, "entries/search", { anilist_id = anilist_id }),
         headers = {
-			["Content-Type"] = "application/json",
-			["Authorization"] = self.API_TOKEN
+            ["Content-Type"] = "application/json",
+            ["Authorization"] = self.API_TOKEN
         }
     }
     local entries, err = mpu.parse_json(response)
@@ -59,20 +59,20 @@ function jimaku:query_subtitles(anilist_id, show_info)
 end
 
 function jimaku:get_files(entry_id)
-	local response = requests:GET {
-		url = requests:build_url(self.BASE_URL, ("entries/%s/files"):format(entry_id)),
-		headers = {
-			["Content-Type"] = "application/json",
-			["Authorization"] = self.API_TOKEN
-		}
-	}
-	local result, err = mpu.parse_json(response)
-	return assert(result, err)
+    local response = requests:GET {
+        url = requests:build_url(self.BASE_URL, ("entries/%s/files"):format(entry_id)),
+        headers = {
+            ["Content-Type"] = "application/json",
+            ["Authorization"] = self.API_TOKEN
+        }
+    }
+    local result, err = mpu.parse_json(response)
+    return assert(result, err)
 end
 
 function jimaku:download_subtitle(file_entry, path)
     local filename = path .. '/' .. file_entry.name
-	requests:save(file_entry.url, filename)
+    requests:save(file_entry.url, filename)
     return filename
 end
 
