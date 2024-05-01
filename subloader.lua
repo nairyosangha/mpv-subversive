@@ -3,6 +3,7 @@ require 'utils/sequence'
 require 'regex'
 local mp = require 'mp'
 local mpu = require 'mp.utils'
+local mpi = require 'mp.input'
 local menu = require 'menu'
 local util = require 'utils/utils'
 
@@ -37,16 +38,78 @@ function menu_selector:close()
     self:erase()
 end
 
-function loader.build_show_menu(show_list, show_info, on_action)
+local function build_menu_entry(anilist_media)
+    local start, end_ = anilist_media.startDate.year, anilist_media.endDate.year
+    local year_string = start == end_ and start or ("%s-%s"):format(start, end_)
+    return ("[%s]  %s  (%s)"):format(anilist_media.format, anilist_media.title.romaji, year_string)
+end
+
+---the backend needs to be inserted in the loader table before calling this function
+---@param show_info table containing parsed_title, ep_number (anilist_data is filled in on success)
+---@param on_action function which is called when the user confirms their selection
+function loader:build_manual_lookup_menu(show_info, on_action)
+    local function log_help()
+        mpi.log("Manual lookup requested, Please start typing the name of the show.")
+        mpi.log("When the correct entry pops up on screen, select it with TAB, and press ENTER.")
+    end
+    local matching_shows = {}           -- contains data as received from AniList
+    local displayed_shows = {}          -- contains only text rendered on screen
+    local cur_idx, last_idx = 0, nil    -- used to highlight the currenctly selected entry
+    local last_lookup_time = os.time()  -- used to debounce requests so we don't spam the AniList API
+    mpi.get {
+        prompt = "Please type the name of the show: ",
+        opened = log_help,
+        submit = function(_)
+            if cur_idx == 0 then
+                mpi.log_error("No show was selected!")
+                return log_help()
+            end
+            mpi.terminate()
+            show_info.anilist_data = matching_shows[cur_idx]
+            on_action(show_info)
+        end,
+        -- we are kinda abusing the complete function here, we never actually complete the text
+        -- we just update the displayed log messages so the user can pick a show there
+        complete = function(user_text)
+            cur_idx = cur_idx + 1
+            if cur_idx > #matching_shows then
+                cur_idx = 1
+            end
+            local current_show = displayed_shows[cur_idx]
+            displayed_shows[cur_idx] = {
+                text = current_show,
+                style = "{\\c&H7a77f2&}",
+                terminal_style = "\027[31m",
+            }
+            if last_idx then
+                displayed_shows[last_idx] = displayed_shows[last_idx].text
+            end
+            last_idx = cur_idx
+            mpi.set_log(displayed_shows)
+            return { user_text }, 1
+        end,
+        edited = function(user_text)
+            local current_time = os.time()
+            if #user_text > 3 and os.difftime(current_time, last_lookup_time) > 1 then
+                last_lookup_time = current_time
+                matching_shows = Sequence(self.backend:query_shows { parsed_title = user_text }):collect()
+                displayed_shows = Sequence(matching_shows):map(build_menu_entry):collect()
+                mpi.set_log(displayed_shows)
+            end
+        end
+    }
+end
+
+function loader:build_show_menu(show_list, show_info, on_action)
     menu_selector.header = "Select the correct show"
-    menu_selector.items = Sequence(show_list):map(function(x)
-        local start, end_ = x.startDate.year, x.endDate.year
-        local year_string = start == end_ and start or ("%s-%s"):format(start, end_)
-        return ("[%s]  %s  (%s)"):format(x.format, x.title.romaji, year_string)
-    end):collect()
+    menu_selector.items = Sequence(show_list):map(build_menu_entry):collect()
+    table.insert(menu_selector.items, 1, " >>>   Text-based lookup")
     function menu_selector:act()
         self:close()
-        show_info.anilist_data = show_list[self.selected]
+        if self.selected == 1 then
+            return loader:build_manual_lookup_menu(show_info, on_action)
+        end
+        show_info.anilist_data = show_list[self.selected-1]
         on_action(show_info)
     end
     menu_selector:open()
@@ -107,6 +170,7 @@ function loader.show_matching_subs(path)
 end
 
 function loader:run(backend)
+    self.backend = backend
     local show_name, episode = backend:parse_current_file(mp.get_property("filename"))
     local initial_show_info = {
         parsed_title = show_name,
@@ -138,12 +202,14 @@ function loader:run(backend)
         if #matching_shows == 0 then
             return mp.osd_message("Failed to query shows", 3)
         end
-        self.build_show_menu(matching_shows, initial_show_info, show_matching_subtitles)
+        self:build_show_menu(matching_shows, initial_show_info, show_matching_subtitles)
     end
 
     ---callback used after we've identified the correct show
     ---@param show_info table containing parsed_title, ep_number and anilist_data
     function show_matching_subtitles(show_info)
+        -- TODO now that we know which show we're dealing with, we could persist the id to disk
+        -- this way we prevent another AniList query for the following episode
         local extracted_subs_path = backend:query_subtitles(show_info)
         self.show_matching_subs(extracted_subs_path)
     end
