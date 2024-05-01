@@ -111,8 +111,8 @@ function backend:extract_archive(file, show_info)
 end
 
 function backend:get_cached_path(show_info)
-    if show_info.ep_num then
-        return string.format("%s/%s/%s", self.cache_directory, show_info.title, show_info.ep_num)
+    if show_info.ep_number then
+        return string.format("%s/%s/%s", self.cache_directory, show_info.title, show_info.ep_number)
     end
     return string.format("%s/%s", self.cache_directory, show_info.title)
 end
