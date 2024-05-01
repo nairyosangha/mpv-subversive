@@ -3,7 +3,9 @@ local url = require("socket.url")
 local socket = require("socket")
 local ltn12 = require("ltn12")
 
-local requests = {}
+local requests = {
+	err_msg = "Invalid %s request: %s"
+}
 
 function requests:GET(options)
 	local sink_table = {}
@@ -14,8 +16,7 @@ function requests:GET(options)
 		sink = ltn12.sink.table(sink_table)
 	}
 	local return_code, _, status = socket.skip(1, http.request(req))
-	assert(return_code == 200, ("ERROR: %s"):format(status))
-	return table.concat(sink_table)
+	return self:validate(return_code, status, table.concat(sink_table), "GET")
 end
 
 function requests:POST(options)
@@ -28,8 +29,7 @@ function requests:POST(options)
 		sink = ltn12.sink.table(sink_table)
 	}
 	local return_code, _, status = socket.skip(1, http.request(req))
-	assert(return_code == 200, ("ERROR: %s"):format(status))
-	return table.concat(sink_table)
+	return self:validate(return_code, status, table.concat(sink_table), "POST")
 end
 
 function requests:build_url(host, path, params)
@@ -50,6 +50,17 @@ function requests:build_request(options)
 	}
 end
 
+function requests:validate(return_code, status, result, method)
+	local function get_err()
+		if type(return_code) == 'string' then -- luasocket failure case
+			return return_code
+		end
+		return ("[HTTP %d ERROR]: %s => %s"):format(return_code, status, result)
+	end
+	assert(return_code == 200, self.err_msg:format(method, get_err()))
+	return result
+end
+
 -- TODO we might be able to get away with only downloading when the user selects the sub
 function requests:save(uri, path_to_file, headers)
 	local sink = ltn12.sink.file(io.open(path_to_file, "wb"))
@@ -59,8 +70,8 @@ function requests:save(uri, path_to_file, headers)
 		headers = headers or {},
 		sink = sink
 	}
-	local code, _, status = socket.skip(1, http.request(request))
-	assert(code == 200, ("%s ERROR: %s"):format(code, status))
+	local return_code, _, status = socket.skip(1, http.request(request))
+	return self:validate(return_code, status, nil, "GET")
 end
 
 return requests
