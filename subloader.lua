@@ -38,6 +38,7 @@ function menu_selector:close()
 end
 
 function loader.build_show_menu(show_list, on_action)
+    menu_selector.header = "Select the correct show"
     menu_selector.items = Sequence(show_list):map(function(x) return x.title.romaji end):collect()
     function menu_selector:act()
         self:close()
@@ -61,6 +62,7 @@ function loader.show_matching_subs(path)
         mp.osd_message("no matching subs")
         return
     end
+    menu_selector.header = "Matching subtitles"
     menu_selector.rect_width = mp.get_property("osd-width") - 100
     menu_selector.font_size = 20
     menu_selector.items = all_subs

@@ -8,6 +8,8 @@ local Menu = assdraw.ass_new()
 function Menu:new(o)
     self.__index = self
     o = o or {}
+    o.items = o.items or {}
+    o.header = o.header or nil
     o.selected = o.selected or 1
     o.canvas_width = o.canvas_width or 1280
     o.canvas_height = o.canvas_height or 720
@@ -20,6 +22,7 @@ function Menu:new(o)
     o.border_color = o.border_color or '000000'
     o.text_color = o.text_color or 'ffffff'
     o.font_size = o.font_size or 25
+    o.padding = o.padding or 5
 
     return setmetatable(o, self)
 end
@@ -29,8 +32,8 @@ function Menu:set_position(x, y)
     self.pos_y = y
 end
 
-function Menu:set_font_size()
-    self:append(string.format([[{\fs%s}]], self.font_size))
+function Menu:set_font_size(size)
+    self:append(string.format([[{\fs%s}]], size or self.font_size))
 end
 
 function Menu:set_text_color(code)
@@ -56,10 +59,8 @@ function Menu:apply_rect_color(i)
 end
 
 function Menu:draw_text(i)
-    local padding = 5
-
     self:new_event()
-    self:pos(self.pos_x + padding, self.pos_y + self.rect_height * (i - 1) + padding)
+    self:pos(self.pos_x + self.padding, self.pos_y + self.rect_height * (i - (self.header and 0 or 1)) + self.padding)
     self:set_font_size()
     self:apply_text_color(i)
     self:append(self.items[i])
@@ -70,13 +71,27 @@ function Menu:draw_item(i)
     self:pos(self.pos_x, self.pos_y)
     self:apply_rect_color(i)
     self:draw_start()
-    self:rect_cw(0, 0 + (i - 1) * self.rect_height, self.rect_width, i * self.rect_height)
+    self:rect_cw(0, 0 + (i - (self.header and 0 or 1)) * self.rect_height, self.rect_width, (i + (self.header and 1 or 0)) * self.rect_height)
     self:draw_stop()
     self:draw_text(i)
 end
 
 function Menu:draw()
     self.text = ''
+    if self.header then
+        self:new_event()
+        self:pos(self.pos_x, self.pos_y)
+        self:set_border_color(self.border_color)
+        self:set_text_color('95bdc7')
+        self:draw_start()
+        self:rect_cw(0, 0, self.rect_width, self.rect_height)
+        self:draw_stop()
+        self:new_event()
+        self:pos(self.pos_x + self.padding, self.pos_y + self.padding)
+        self:set_font_size(27)
+        self:apply_text_color()
+        self:append(self.header)
+    end
     for i, _ in ipairs(self.items) do
         self:draw_item(i)
     end
