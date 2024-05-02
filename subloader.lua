@@ -1,6 +1,6 @@
 local loader = {}
-require 'utils/sequence'
-require 'regex'
+require 'utils.sequence'
+require 'utils.regex'
 local mp = require 'mp'
 local mpu = require 'mp.utils'
 local mpi = require 'mp.input'

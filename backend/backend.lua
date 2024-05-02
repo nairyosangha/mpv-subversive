@@ -1,5 +1,5 @@
-require 'utils/sequence'
-require 'regex'
+require 'utils.sequence'
+require 'utils.regex'
 local mpu = require 'mp.utils'
 local util = require 'utils/utils'
 local archive = require 'archive'

@@ -1,3 +1,4 @@
+require 'utils.sequence'
 local util = require 'utils/utils'
 local mpu = require 'mp.utils'
 
