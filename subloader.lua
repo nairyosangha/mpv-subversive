@@ -40,7 +40,7 @@ end
 
 local function build_menu_entry(anilist_media)
     local start, end_ = anilist_media.startDate.year, anilist_media.endDate.year
-    local year_string = start == end_ and start or ("%s-%s"):format(start, end_)
+    local year_string = start == end_ and start or ("%s-%s"):format(start, end_ or '...')
     return ("[%s]  %s  (%s)"):format(anilist_media.format, anilist_media.title.romaji, year_string)
 end
 
