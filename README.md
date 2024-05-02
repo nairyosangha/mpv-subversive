@@ -27,6 +27,8 @@ git clone --recurse-submodules https://github.com/nairyosangha/mpv-subversive.gi
 
 ## Usage
 
+### Identifying media
+
 When pressing `b` (for browse!) the plugin will ask the user to identify the media they're currently watching.
 
 This is done by trying to parse the media's filename and extracting the title and episode number from it.
@@ -35,14 +37,17 @@ This file should contain the numeric ID used by AniList, e.g. for the [following
 
 Once we know this ID, we can use this to see if any subtitles are available for it.
 
-### Online
+### Finding suitable subtitles
+
+#### Online (Jimaku)
+
 When using the online mode, the plugin queries Jimaku directly. To be able to do this, you need to [create an account](https://jimaku.cc/login) and [generate an API key](https://jimaku.cc/account).
 The API key then needs to be added in `main.lua`:
 https://github.com/nairyosangha/mpv-subversive/blob/2325b5656fdcca0d2ed7ef546e89b5757b718ebd/main.lua#L12
 
 
-### Offline (not fully done yet)
-To be able to use the plugin in offline mode, you need to have a locally stored archive of subtitles, and a mapping which links AniList IDs to a absolute path to the directory containing subtitle files for this show.
+#### Offline (local mapping file)
+To be able to use the plugin in offline mode, you need to have a locally stored archive of subtitles, and a mapping which links an AniList ID to a path to the directory (or zip/rar file) containing subtitles for the given ID.
 By default we look for a mapping file called `mapping.csv` in the script's directory itself. This can be overwritten in `main.lua`:
 https://github.com/nairyosangha/mpv-subversive/blob/2325b5656fdcca0d2ed7ef546e89b5757b718ebd/main.lua#L10
 

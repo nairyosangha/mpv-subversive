@@ -208,15 +208,17 @@ function loader:run(backend)
         return loader.show_matching_subs(cached_path)
     end
 
-    -- TODO we never save this anywhere
-    util.open_file("./.anilist.id", 'r', function(f)
-        local id = f:read("*a")
-        print("Found existing ./.anilist.id, skipping show lookup")
-        return show_matching_subtitles(id)
-    end)
-
     -- show titles which match the parsed show title
     function get_show_id()
+        local saved_id = util.open_file("./.anilist.id", 'r', function(f) return f:read("*l") end)
+        if saved_id then
+            print("Found existing ./.anilist.id, skipping show lookup")
+            return show_matching_subtitles {
+                parsed_title = initial_show_info.parsed_title,
+                ep_number = initial_show_info.ep_number,
+                anilist_data = { id = saved_id }
+            }
+        end
         -- only show at most 10 entries, if there are more we probably parsed the show name wrong, plus the list wouldn't render right anyway
         local matching_shows = util.table_slice(backend:query_shows(initial_show_info), 1, 11)
         if #matching_shows == 0 then

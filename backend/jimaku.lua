@@ -2,16 +2,10 @@ require 'utils.sequence'
 local requests = require 'requests'
 local mp = require 'mp'
 local mpu = require 'mp.utils'
-local utils = require 'utils.utils'
 
 local jimaku = {
     BASE_URL = "https://jimaku.cc/api/"
 }
-
-local function is_archive(filename)
-    local ext = string.upper(utils.get_extension(filename))
-    return ext == 'RAR' or ext == 'ZIP'
-end
 
 ---Extract all subtitles which are available for the given ID
 ---@param show_info table containing title, ep_number and anilist_data
@@ -29,16 +23,7 @@ function jimaku:query_subtitles(show_info)
     local entries, err = mpu.parse_json(response)
     assert(entries, err)
     local file_filter = function(file_entry)
-        if not show_info.ep_number or file_entry.is_archive then
-            return true
-        end
-        local sanitized_filename = self.sanitize(file_entry.name)
-        local zero_padded_ep_number = ("%%0%dd"):format(#tostring(show_info.anilist_data.episodes or "00")):format(show_info.ep_number)
-        local match = sanitized_filename:match(zero_padded_ep_number)
-        if not match then
-            print(("Discarding sub which didn't match ep_number %s (sanitized fn '%s')"):format(show_info.ep_number, sanitized_filename))
-        end
-        return match
+        return file_entry.is_archive or self:is_matching_episode(show_info, file_entry.name)
     end
     local cached_path = self:get_cached_path(show_info)
     os.execute(string.format("mkdir -p %q", cached_path))
@@ -46,7 +31,7 @@ function jimaku:query_subtitles(show_info)
         print(("Found matching entry '%s', id: %d"):format(entry.name, entry.id))
         Sequence(self:get_files(entry.id))
             :map(function(x)
-                x.is_archive = is_archive(x.name)
+                x.is_archive = self:is_supported_archive(x.name)
                 return x
             end)
             :filter(file_filter)

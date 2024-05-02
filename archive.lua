@@ -46,7 +46,7 @@ function RAR:list_files(args)
 end
 
 function ZIP:check_valid()
-    return execute(string.format("zip -T %q", self.path)) == 0
+    return execute(string.format("unzip -t %q", self.path)) == 0
 end
 
 function RAR:check_valid()

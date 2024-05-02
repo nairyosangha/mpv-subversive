@@ -18,6 +18,24 @@ function backend:new(options)
     })
 end
 
+function backend:is_supported_archive(filename)
+    local ext = string.upper(util.get_extension(filename))
+    return self.archive_extensions[ext:upper()]
+end
+
+function backend:is_matching_episode(show_info, filename)
+    if not show_info.ep_number then
+        return true
+    end
+    local sanitized_filename = self.sanitize(filename)
+    local zero_padded_ep_number = ("%%0%dd"):format(#tostring(show_info.anilist_data.episodes or "00")):format(show_info.ep_number)
+    local match = sanitized_filename:match(zero_padded_ep_number)
+    if not match then
+        print(("Discarding file which didn't match ep_number %s (sanitized fn '%s')"):format(show_info.ep_number, sanitized_filename))
+    end
+    return match
+end
+
 ---Use AniList's search API to query the show name (parsed from the filename)
 ---@param show_info table containing parsed_title, ep_number (anilist_data is not filled in at this point)
 ---@return table containing all shows which match the title
@@ -103,7 +121,7 @@ function backend:extract_archive(file, show_info)
                 return
             end
             for arch in parser:list_files { filter = extensions } do
-                if not show_info.ep_number or self.sanitize(arch):match(show_info.ep_number) then
+                if self:is_matching_episode(show_info, arch) then
                     parser:extract { filter = { arch }, target_path = cached_path }
                 end
             end
