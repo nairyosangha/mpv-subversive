@@ -165,7 +165,7 @@ function backend.extract_title_and_number(text)
     local _, re = matchers:find_first(function(re) return re:match(text) end)
     if re then
         local title, ep_number = re:groups()
-        return title, tonumber(ep_number)
+        return title:gsub("%s+$", ""):gsub("^%s+", ""), tonumber(ep_number)
     end
     return text
 end
