@@ -23,8 +23,8 @@ function menu_selector:get_keybindings()
     }
 end
 
-function menu_selector:open()
-    self.selected = 1
+function menu_selector:open(has_header)
+    self.selected = 1 + (has_header and 1 or 0)
     for _, val in pairs(self:get_keybindings()) do
         mp.add_forced_key_binding(val.key, val.key, val.fn)
     end
@@ -92,7 +92,7 @@ function loader:build_manual_lookup_console(show_info, on_action)
             local current_time = os.time()
             if #user_text > 3 and os.difftime(current_time, last_lookup_time) > 1 then
                 last_lookup_time = current_time
-                matching_shows = Sequence(self.backend:query_shows { parsed_title = user_text }):collect()
+                matching_shows = self.backend:query_shows { parsed_title = user_text }
                 displayed_shows = Sequence(matching_shows):map(build_menu_entry):collect()
                 mpi.set_log(displayed_shows)
             end
@@ -104,34 +104,34 @@ end
 ---@param show_info table containing parsed_title, ep_number (anilist_data is not filled in at this point)
 ---@param on_action function which is called when the user confirms their selection
 function loader:build_manual_lookup_menu(show_info, on_action)
-    menu_selector.header = "No matching shows, try manual lookup?"
-    menu_selector.items = { "Yes", "No" }
-    menu_selector.act = function(self_menu)
-        self_menu:close()
-        if self_menu.selected == 2 then -- No
-            return mp.osd_message("No matching shows.", 3)
-        end
-        self:build_manual_lookup_console(show_info, on_action)
-    end
-    menu_selector:open()
+    menu_selector:set_header(([[No show matches found for lookup: %s, episode: %s]]):format(show_info.parsed_title, show_info.ep_number or 'N/A'))
+    menu_selector:add_item { text = "Yes", on_chosen_cb = function() self:build_manual_lookup_console(show_info, on_action) end }
+    menu_selector:add_item { text = "No",  on_chosen_cb = function() mp.osd_message("No matching shows.", 3) end }
+    menu_selector:open(true)
 end
 
 ---@param show_list table with all shows that match the automatically parsed filename
 ---@param show_info table containing parsed_title, ep_number (anilist_data is not filled in at this point)
 ---@param on_action function which is called when the user confirms their selection
 function loader:build_show_menu(show_list, show_info, on_action)
-    menu_selector.header = "Select the correct show"
-    menu_selector.items = Sequence(show_list):map(build_menu_entry):collect()
-    table.insert(menu_selector.items, 1, " >>>   Text-based lookup")
-    function menu_selector:act()
-        self:close()
-        if self.selected == 1 then
-            return loader:build_manual_lookup_console(show_info, on_action)
-        end
-        show_info.anilist_data = show_list[self.selected-1]
-        on_action(show_info)
-    end
-    menu_selector:open()
+    local SHOW_LIST_OFFSET = 2 -- to compensate for the 2 non-show menu entries (header and text-based-lookup option)
+    menu_selector:set_header(([[Looking for: %s, episode: %s]]):format(show_info.parsed_title, show_info.ep_number or 'N/A'))
+    menu_selector:add_item {
+        text = " >>>   Text-based lookup",
+        on_chosen_cb = function() loader:build_manual_lookup_console(show_info, on_action) end
+    }
+    Sequence(show_list)
+        :map(build_menu_entry)
+        :foreach(function(item)
+            menu_selector:add_item {
+                text = item,
+                on_chosen_cb = function(menu_item)
+                    show_info.anilist_data = show_list[menu_item.idx - SHOW_LIST_OFFSET]
+                    on_action(show_info)
+                end
+            }
+        end)
+    menu_selector:open(true)
 end
 
 --- Displays menu with all the subtitles that match the current show
@@ -142,50 +142,46 @@ function loader.show_matching_subs(path)
         return string.format("%s/%s", path, subtitle)
     end
     local all_subs = util.run_cmd(string.format("ls %q", path))
-    local with_full_path = Sequence(all_subs)
-        :map(to_full_path)
-        :collect()
+    local with_full_path = Sequence(all_subs):map(to_full_path):collect()
     if #all_subs == 0 then
         mp.osd_message("no matching subs", 3)
         return
     end
-    menu_selector.header = "Matching subtitles"
-    menu_selector.rect_width = mp.get_property("osd-width") - 100
-    menu_selector.font_size = 20
-    menu_selector.items = all_subs
-    menu_selector.last_selected = nil -- store sid of active sub here
-
-    function menu_selector:update_sub()
-        if self.last_selected then
-            mp.commandv("sub_remove", self.last_selected)
-        end
-
-        mp.commandv("sub_add", with_full_path[self.selected], 'cached', 'autoloader', 'jp')
-        self.last_selected = mp.get_property('sid')
-    end
-    function menu_selector:up()
-        menu.up(menu_selector)
-        self:update_sub() end
-    function menu_selector:down()
-        menu.down(menu_selector)
-        self:update_sub()
-    end
-    function menu_selector:act()
-        local selected_sub = with_full_path[self.selected]
+    local SUB_LIST_OFFSET = 1 -- to compensate for the non-sub header menu entry
+    local function choose_subtitle(sub_menu_item)
+        local selected_sub = with_full_path[sub_menu_item.idx - SUB_LIST_OFFSET]
         local _, selected_sub_file = mpu.split_path(selected_sub)
         mp.osd_message(string.format("chose: %s", selected_sub_file), 2)
         local dir, fn = mpu.split_path(mp.get_property("filename/no-ext"))
+        -- TODO this should be configurable
         local subs_path = string.format(dir .. "/subs/")
         if not util.path_exists(subs_path) then
             os.execute(string.format("mkdir %q", subs_path))
         end
         local sub_fn = table.concat({ subs_path, fn, ".", util.get_extension(selected_sub) })
         os.execute(string.format("cp %q %q", selected_sub, sub_fn))
-        self:close()
     end
-    menu_selector:open()
-    menu_selector:update_sub()
-    return nil
+
+    local function select_subtitle(sub_menu_item)
+        if sub_menu_item.parent.last_selected then
+            mp.commandv("sub_remove", sub_menu_item.parent.last_selected)
+        end
+        mp.commandv("sub_add", with_full_path[sub_menu_item.parent.selected - SUB_LIST_OFFSET], 'cached', 'autoloader', 'jp')
+        sub_menu_item.parent.last_selected = mp.get_property('sid')
+    end
+
+    menu_selector:set_header("Matching subtitles")
+    menu_selector.last_selected = nil -- store sid of active sub here
+    for _, sub in ipairs(all_subs) do
+        menu_selector:add_item {
+            text = sub,
+            width = mp.get_property("osd-width") - 100,
+            font_size = 20,
+            on_selected_cb = select_subtitle,
+            on_chosen_cb = choose_subtitle
+        }
+    end
+    menu_selector:open(true)
 end
 
 function loader:run(backend)
