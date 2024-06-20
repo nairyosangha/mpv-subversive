@@ -21,7 +21,8 @@ function MenuItem:new(opts)
     local new = {}
     -- text field is used internally by assdraw so we use display_text
     new.display_text = opts.text
-    new.selectable = opts.selectable
+    new.is_enabled = opts.is_enabled == nil and true or opts.is_enabled
+    new.is_visible = opts.is_visible == nil and true or opts.is_visible
     new.on_chosen_cb = opts.on_chosen_cb
     new.on_selected_cb = opts.on_selected_cb or function() end
     new.active_color = opts.active_color or self.DEFAULT_ACTIVE_COLOR
@@ -41,6 +42,10 @@ function MenuItem:new(opts)
             return ("MenuItem { %s }"):format(table.concat(string_rep, ", "))
         end
     })
+end
+
+function MenuItem:is_selectable()
+    return self.is_enabled == true and self.is_visible == true
 end
 
 function MenuItem:draw()
@@ -106,7 +111,8 @@ end
 
 function Menu:set_header(header_text)
     self.items[1] = MenuItem:new {
-        selectable = false,
+        is_enabled = false,
+        is_visible = true,
         text = header_text,
         text_color = '95bdc7',
         font_size = 27
@@ -115,9 +121,21 @@ function Menu:set_header(header_text)
     self.items[1].parent = self
 end
 
+function Menu:new_item(item_opts)
+    local new = MenuItem:new(item_opts)
+    new.parent = self
+    return new
+end
+
+function Menu:add(item)
+    table.insert(self.items, item)
+    item.idx = #self.items
+end
+
 function Menu:add_item(item_opts)
     table.insert(self.items, MenuItem:new(item_opts))
-    self.items[#self.items].selectable = true
+    self.items[#self.items].is_enabled = true
+    self.items[#self.items].is_visible = true
     self.items[#self.items].idx = #self.items
     self.items[#self.items].parent = self
 end
@@ -135,7 +153,10 @@ end
 function Menu:draw()
     self.text_table = {}
     for _,i in ipairs(self.items) do
-        table.insert(self.text_table, i:draw())
+        -- TODO if we're invisible this index stuff will  not match
+        if i.is_visible then
+            table.insert(self.text_table, i:draw())
+        end
     end
     self.items[self.selected]:on_selected_cb()
     mp.set_osd_ass(self.canvas_width, self.canvas_height, table.concat(self.text_table, "\n"))
@@ -151,7 +172,7 @@ function Menu:up()
         if self.selected == 0 then
             self.selected = #self.items
         end
-        if self.items[self.selected].selectable == true then
+        if self.items[self.selected]:is_selectable() then
             self:draw()
             return self.items[self.selected]:on_selected_cb()
         end
@@ -165,7 +186,7 @@ function Menu:down()
         if self.selected > #self.items then
             self.selected = 1
         end
-        if self.items[self.selected].selectable then
+        if self.items[self.selected]:is_selectable() then
             self:draw()
             return self.items[self.selected]:on_selected_cb()
         end
@@ -175,9 +196,36 @@ end
 
 function Menu:act()
     self:close()
-    local item = self.items[self.selected]
-    self:clear_items() -- make sure this is done before the callback, so it doesn't interfere with whatever the cb does with the menu items
-    item:on_chosen_cb()
+    self.items[self.selected]:on_chosen_cb()
+end
+
+function Menu:get_keybindings()
+    return {
+        { key = 'h', fn = function() self:close() end },
+        { key = 'j', fn = function() self:down() end },
+        { key = 'k', fn = function() self:up() end },
+        { key = 'l', fn = function() self:act() end },
+        { key = 'down', fn = function() self:down() end },
+        { key = 'up', fn = function() self:up() end },
+        { key = 'Enter', fn = function() self:act() end },
+        { key = 'ESC', fn = function() self:close() end },
+        { key = 'n', fn = function() self:close() end },
+    }
+end
+
+function Menu:open(has_header)
+    self.selected = 1 + (has_header and 1 or 0)
+    for _, val in pairs(self:get_keybindings()) do
+        mp.add_forced_key_binding(val.key, val.key, val.fn)
+    end
+    self:draw()
+end
+
+function Menu:close()
+    for _, val in pairs(self:get_keybindings()) do
+        mp.remove_key_binding(val.key, val.key, val.fn)
+    end
+    self:erase()
 end
 
 return Menu

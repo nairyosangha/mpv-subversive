@@ -7,47 +7,35 @@ local mpi = require 'mp.input'
 local menu = require 'menu'
 local util = require 'utils/utils'
 
--- default menu which can be used for the different selection views
-local menu_selector = menu:new { pos_x = 50, pos_y = 50, rect_width = 500 }
-function menu_selector:get_keybindings()
-    return {
-        { key = 'h', fn = function() self:close() end },
-        { key = 'j', fn = function() self:down() end },
-        { key = 'k', fn = function() self:up() end },
-        { key = 'l', fn = function() self:act() end },
-        { key = 'down', fn = function() self:down() end },
-        { key = 'up', fn = function() self:up() end },
-        { key = 'Enter', fn = function() self:act() end },
-        { key = 'ESC', fn = function() self:close() end },
-        { key = 'n', fn = function() self:close() end },
-    }
-end
-
-function menu_selector:open(has_header)
-    self.selected = 1 + (has_header and 1 or 0)
-    for _, val in pairs(self:get_keybindings()) do
-        mp.add_forced_key_binding(val.key, val.key, val.fn)
-    end
-    self:draw()
-end
-
-function menu_selector:close()
-    for _, val in pairs(self:get_keybindings()) do
-        mp.remove_key_binding(val.key, val.key, val.fn)
-    end
-    self:erase()
-end
-
 local function build_menu_entry(anilist_media)
     local start, end_ = anilist_media.startDate.year, anilist_media.endDate.year
     local year_string = start == end_ and start or ("%s-%s"):format(start, end_ or '...')
     return ("[%s]  %s  (%s)"):format(anilist_media.format, anilist_media.title.romaji, year_string)
 end
 
----the backend needs to be inserted in the loader table before calling this function
----@param show_info table containing parsed_title, ep_number (anilist_data is filled in on success)
----@param on_action function which is called when the user confirms their selection
-function loader:build_manual_lookup_console(show_info, on_action)
+local show_selector = menu:new { pos_x = 50, pos_y = 50, rect_width = 500 }
+local sub_selector = menu:new { pos_x = 50, pos_y = 50, rect_width = 600 }
+
+function show_selector:build_manual_episode_console(show_list)
+    mpi.get {
+        prompt = "Please type the correct episode number: ",
+        submit = function(episode_text)
+            local ep_number = tonumber(episode_text)
+            if ep_number then
+                mpi.terminate()
+                self.show_info.ep_number = ep_number
+                self:display(show_list)
+            end
+        end,
+        edited = function(episode_text)
+            if not tonumber(episode_text) then
+                mpi.log("This isn't a valid number!")
+            end
+        end,
+    }
+end
+
+function show_selector:build_manual_lookup_console()
     local function log_help()
         mpi.log("Manual lookup requested, Please start typing the name of the show.")
         mpi.log("When the correct entry pops up on screen, select it with TAB, and press ENTER.")
@@ -65,8 +53,8 @@ function loader:build_manual_lookup_console(show_info, on_action)
                 return log_help()
             end
             mpi.terminate()
-            show_info.anilist_data = matching_shows[cur_idx]
-            on_action(show_info)
+            local anilist_data = matching_shows[cur_idx]
+            sub_selector:query(self.show_info, anilist_data)
         end,
         -- we are kinda abusing the complete function here, we never actually complete the text
         -- we just update the displayed log messages so the user can pick a show there
@@ -100,44 +88,64 @@ function loader:build_manual_lookup_console(show_info, on_action)
     }
 end
 
----Unlike the build_manual_lookup_console function, this first displays a GUI menu asking the user if they want to try a manual lookup.
----@param show_info table containing parsed_title, ep_number (anilist_data is not filled in at this point)
----@param on_action function which is called when the user confirms their selection
-function loader:build_manual_lookup_menu(show_info, on_action)
-    menu_selector:set_header(([[No show matches found for lookup: %s, episode: %s]]):format(show_info.parsed_title, show_info.ep_number or 'N/A'))
-    menu_selector:add_item { text = "Yes", on_chosen_cb = function() self:build_manual_lookup_console(show_info, on_action) end }
-    menu_selector:add_item { text = "No",  on_chosen_cb = function() mp.osd_message("No matching shows.", 3) end }
-    menu_selector:open(true)
-end
-
----@param show_list table with all shows that match the automatically parsed filename
----@param show_info table containing parsed_title, ep_number (anilist_data is not filled in at this point)
----@param on_action function which is called when the user confirms their selection
-function loader:build_show_menu(show_list, show_info, on_action)
-    local SHOW_LIST_OFFSET = 2 -- to compensate for the 2 non-show menu entries (header and text-based-lookup option)
-    menu_selector:set_header(([[Looking for: %s, episode: %s]]):format(show_info.parsed_title, show_info.ep_number or 'N/A'))
-    menu_selector:add_item {
+function show_selector:init(backend, show_info)
+    self.backend = backend
+    self.show_info = show_info
+    self.offset = 3 -- to compensate for the header, show and episode lookup entries
+    self.modify_show_item = self:new_item {
         text = " >>>   Text-based lookup",
-        on_chosen_cb = function() loader:build_manual_lookup_console(show_info, on_action) end
+        on_chosen_cb = function() self:build_manual_lookup_console() end
     }
-    Sequence(show_list)
-        :map(build_menu_entry)
-        :foreach(function(item)
-            menu_selector:add_item {
-                text = item,
-                on_chosen_cb = function(menu_item)
-                    show_info.anilist_data = show_list[menu_item.idx - SHOW_LIST_OFFSET]
-                    on_action(show_info)
-                end
-            }
-        end)
-    menu_selector:open(true)
+    self.modify_episode_item = self:new_item {
+        text = (" >>>   Modify episode number"):format(show_info.ep_number or 'N/A'),
+        on_chosen_cb = nil -- we set this in the display when we actually have the list of shows
+    }
+    self.initialized = true
 end
 
---- Displays menu with all the subtitles that match the current show
---- @param path string: path where extracted subtitle files are stored
---- @return nil
-function loader.show_matching_subs(path)
+function show_selector:display(show_list)
+    self:clear_items()
+    self:set_header(([[Looking for: %s, episode: %s]]):format(self.show_info.parsed_title, self.show_info.ep_number or 'N/A'))
+    self.modify_episode_item.on_chosen_cb = function() self:build_manual_episode_console(show_list) end
+    self:add(self.modify_show_item)
+    self:add(self.modify_episode_item)
+
+    for _,s in ipairs(show_list) do
+        self:add_item {
+            text = build_menu_entry(s),
+            on_chosen_cb = function(item)
+                local anilist_data = show_list[item.idx - self.offset]
+                sub_selector:query(self.show_info, anilist_data)
+            end
+        }
+    end
+    self.selected = 2
+    self:open(true)
+end
+
+function sub_selector:init(backend)
+    self.backend = backend
+    self.offset = 2 -- to compensate for the non-sub header menu entry and back option
+    self.back_item = self:new_item {
+        text = " >>>   Return to show selection",
+        on_chosen_cb = function()
+            self:close()
+            show_selector:open(true)
+        end
+    }
+end
+
+function sub_selector:query(show_info, anilist_data)
+    if anilist_data then
+        show_info.anilist_data = anilist_data
+        -- bit of a hack to not display subs for a different show if we manually changed the episode name
+        show_info.parsed_title = anilist_data.title and anilist_data.title.romaji or show_info.parsed_title
+    end
+    local path_to_subs = self.backend:query_subtitles(show_info)
+    self:display(path_to_subs)
+end
+
+function sub_selector:display(path)
     local function to_full_path(subtitle)
         return string.format("%s/%s", path, subtitle)
     end
@@ -147,9 +155,8 @@ function loader.show_matching_subs(path)
         mp.osd_message("no matching subs", 3)
         return
     end
-    local SUB_LIST_OFFSET = 1 -- to compensate for the non-sub header menu entry
     local function choose_subtitle(sub_menu_item)
-        local selected_sub = with_full_path[sub_menu_item.idx - SUB_LIST_OFFSET]
+        local selected_sub = with_full_path[sub_menu_item.idx - self.offset]
         local _, selected_sub_file = mpu.split_path(selected_sub)
         mp.osd_message(string.format("chose: %s", selected_sub_file), 2)
         local dir, fn = mpu.split_path(mp.get_property("filename/no-ext"))
@@ -166,14 +173,18 @@ function loader.show_matching_subs(path)
         if sub_menu_item.parent.last_selected then
             mp.commandv("sub_remove", sub_menu_item.parent.last_selected)
         end
-        mp.commandv("sub_add", with_full_path[sub_menu_item.parent.selected - SUB_LIST_OFFSET], 'cached', 'autoloader', 'jp')
+        mp.commandv("sub_add", with_full_path[sub_menu_item.parent.selected - self.offset], 'cached', 'autoloader', 'jp')
         sub_menu_item.parent.last_selected = mp.get_property('sid')
     end
 
-    menu_selector:set_header("Matching subtitles")
-    menu_selector.last_selected = nil -- store sid of active sub here
+    self:clear_items()
+    self:set_header(("Found %s matching files"):format(#all_subs))
+    if show_selector.initialized then
+        self:add(self.back_item)
+    end
+    self.last_selected = nil -- store sid of active sub here
     for _, sub in ipairs(all_subs) do
-        menu_selector:add_item {
+        self:add_item {
             text = sub,
             width = mp.get_property("osd-width") - 100,
             font_size = 20,
@@ -181,11 +192,10 @@ function loader.show_matching_subs(path)
             on_chosen_cb = choose_subtitle
         }
     end
-    menu_selector:open(true)
+    self:open(true)
 end
 
 function loader:run(backend)
-    self.backend = backend
     local show_name, episode = backend:parse_current_file(mp.get_property("filename"))
     local initial_show_info = {
         parsed_title = show_name,
@@ -194,45 +204,26 @@ function loader:run(backend)
         anilist_data = nil
     }
     print(("show title: '%s', episode number: '%d'"):format(show_name, episode or -1))
+    show_selector:init(backend, initial_show_info)
+    sub_selector:init(backend)
 
     local show_matching_subtitles, get_show_id
 
-    -- check whether we already extracted subs for this show / episode
+    -- first check if we already have a save path for this episode
     local cached_path = backend:get_cached_path(initial_show_info)
     if util.path_exists(cached_path) then
-        print("loading cached path: " .. cached_path)
-        return loader.show_matching_subs(cached_path)
+        return sub_selector:display(cached_path)
     end
 
-    -- show titles which match the parsed show title
-    function get_show_id()
-        local saved_id = util.open_file("./.anilist.id", 'r', function(f) return f:read("*l") end)
-        if saved_id then
-            print("Found existing ./.anilist.id, skipping show lookup")
-            return show_matching_subtitles {
-                parsed_title = initial_show_info.parsed_title,
-                ep_number = initial_show_info.ep_number,
-                anilist_data = { id = saved_id }
-            }
-        end
-        -- only show at most 10 entries, if there are more we probably parsed the show name wrong, plus the list wouldn't render right anyway
-        local matching_shows = util.table_slice(backend:query_shows(initial_show_info), 1, 11)
-        if #matching_shows == 0 then
-            return self:build_manual_lookup_menu(initial_show_info, show_matching_subtitles)
-        end
-        self:build_show_menu(matching_shows, initial_show_info, show_matching_subtitles)
+    -- look for .anilist.id file to skip the jimaku lookup
+    local saved_id = util.open_file("./.anilist.id", 'r', function(f) return f:read("*l") end)
+    if saved_id then
+        return sub_selector:query(initial_show_info, { id = saved_id })
     end
 
-    ---callback used after we've identified the correct show
-    ---@param show_info table containing parsed_title, ep_number and anilist_data
-    function show_matching_subtitles(show_info)
-        -- TODO now that we know which show we're dealing with, we could persist the id to disk
-        -- this way we prevent another AniList query for the following episode
-        local extracted_subs_path = backend:query_subtitles(show_info)
-        self.show_matching_subs(extracted_subs_path)
-    end
-
-    get_show_id()
+    -- only show at most 10 entries, if there are more we probably parsed the show name wrong, plus the list wouldn't render right anyway
+    local matching_shows = util.table_slice(backend:query_shows(initial_show_info), 1, 11)
+    show_selector:display(matching_shows)
 end
 
 return loader
