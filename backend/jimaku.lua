@@ -27,22 +27,21 @@ function jimaku:query_subtitles(show_info)
     end
     local cached_path = self:get_cached_path(show_info)
     os.execute(string.format("mkdir -p %q", cached_path))
+
+    local items = {}
     for _, entry in ipairs(entries) do
         print(("Found matching entry '%s', id: %d"):format(entry.name, entry.id))
         Sequence(self:get_files(entry.id))
-            :map(function(x)
+            :foreach(function(x)
                 x.is_archive = self:is_supported_archive(x.name)
+                x.is_episode_matching = file_filter
+                x.download_cb = function(path) return self:download_subtitle(x, cached_path) end
+                x.download_archive_cb = function() return self:extract_archive(x, show_info) end
+                table.insert(items, x)
                 return x
             end)
-            :filter(file_filter)
-            :foreach(function(file_entry)
-                local fn = self:download_subtitle(file_entry, cached_path)
-                if file_entry.is_archive then
-                    self:extract_archive(fn, show_info)
-                end
-            end)
     end
-    return cached_path
+    return items
 end
 
 function jimaku:get_files(entry_id)

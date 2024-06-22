@@ -141,17 +141,17 @@ function sub_selector:query(show_info, anilist_data)
         -- bit of a hack to not display subs for a different show if we manually changed the episode name
         show_info.parsed_title = anilist_data.title and anilist_data.title.romaji or show_info.parsed_title
     end
-    local path_to_subs = self.backend:query_subtitles(show_info)
-    self:display(path_to_subs)
+    local items = self.backend:query_subtitles(show_info)
+    self:display(items)
 end
 
-function sub_selector:display(path)
+function sub_selector:display(items)
     local function to_full_path(subtitle)
         return string.format("%s/%s", path, subtitle)
     end
     local all_subs = util.run_cmd(string.format("ls %q", path))
     local with_full_path = Sequence(all_subs):map(to_full_path):collect()
-    if #all_subs == 0 then
+    if #items == 0 then
         mp.osd_message("no matching subs", 3)
         return
     end
@@ -183,6 +183,18 @@ function sub_selector:display(path)
         self:add(self.back_item)
     end
     self.last_selected = nil -- store sid of active sub here
+    for _, item in ipairs(items) do
+        local text = item.name
+        if item.is_archive then
+            text = "<ENTER to download archive> " .. text
+        self:add_item {
+            text = text,
+            width = mp.get_property("osd-width") - 100,
+            font_size = 17,
+            on_selected_cb = 
+
+        }
+    end
     for _, sub in ipairs(all_subs) do
         self:add_item {
             text = sub,

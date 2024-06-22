@@ -96,6 +96,24 @@ function MenuItem:apply_rect_color()
     end
 end
 
+-- returns the visible and selectable item below this one, if any
+function MenuItem:next()
+    for i=self.idx+1, #self.parent.items do
+        if i:is_selectable() then
+            return self.parent.items[i]
+        end
+    end
+end
+
+-- returns the visible and selectable item above this one, if any
+function MenuItem:prev()
+    for i=self.idx-1, 1, -1 do
+        if i:is_selectable() then
+            return self.parent.items[i]
+        end
+    end
+end
+
 function Menu:new(o)
     self.__index = self
     o = o or {}
