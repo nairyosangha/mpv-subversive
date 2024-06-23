@@ -48,23 +48,24 @@ function MenuItem:is_selectable()
     return self.is_enabled == true and self.is_visible == true
 end
 
-function MenuItem:draw()
+---@param display_idx number the index at which this item is displayed on screen, this isn't necessarily its own internal idx
+function MenuItem:draw(display_idx)
     self.text = ''
     -- our idx starts at 1 but we want to start at 0 here
-    local x0, y0 = self.parent.pos_x, self.parent.pos_y + ((self.idx-1) * self.height)
+    local x0, y0 = self.parent.pos_x, self.parent.pos_y + ((display_idx-1) * self.height)
     self:new_event()
     self:apply_rect_color()
     self:draw_start()
     self:pos(x0, y0)
     self:rect_cw(0, 0, self.width, self.height)
     self:draw_stop()
-    self:draw_text()
+    self:draw_text(display_idx)
     return self.text
 end
 
-function MenuItem:draw_text()
+function MenuItem:draw_text(display_idx)
     self:new_event()
-    self:pos(self.parent.pos_x + self.parent.padding, self.parent.pos_y + (self.height * (self.idx - 1)) + self.parent.padding)
+    self:pos(self.parent.pos_x + self.parent.padding, self.parent.pos_y + (self.height * (display_idx - 1)) + self.parent.padding)
     self:set_font_size()
     self:apply_text_color()
     self:append(self.display_text)
@@ -169,11 +170,14 @@ function Menu:clear_items(with_redraw)
 end
 
 function Menu:draw()
+    local display_idx = 1
     self.text_table = {}
-    for _,i in ipairs(self.items) do
-        -- TODO if we're invisible this index stuff will  not match
-        if i.is_visible then
-            table.insert(self.text_table, i:draw())
+    for i=1, #self.items do
+        local entry = self.items[i]
+        if entry.is_visible then
+            table.insert(self.text_table, entry:draw(display_idx))
+            display_idx = display_idx + 1
+            print(entry)
         end
     end
     self.items[self.selected]:on_selected_cb()

@@ -33,7 +33,7 @@ function backend:is_matching_episode(show_info, filename)
     if not match then
         print(("Discarding file which didn't match ep_number %s (sanitized fn '%s')"):format(show_info.ep_number, sanitized_filename))
     end
-    return match
+    return match ~= nil
 end
 
 ---Use AniList's search API to query the show name (parsed from the filename)

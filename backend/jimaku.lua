@@ -31,6 +31,7 @@ function jimaku:query_subtitles(show_info)
     local items = {}
     for _, entry in ipairs(entries) do
         for _, file in ipairs(self:get_files(entry.id)) do
+            file.matching_episode = file_filter(file)
             file.absolute_path = cached_path .. '/' .. file.name
             table.insert(items, file)
         end

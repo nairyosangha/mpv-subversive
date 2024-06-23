@@ -189,6 +189,7 @@ function sub_selector:display(subtitles)
         local menu_entry = self:new_item {
             text = text,
             width = mp.get_property("osd-width") - 100,
+            is_visible = sub.matching_episode,
             font_size = 17,
             on_selected_cb = select_sub,
             on_chosen_cb = choose_sub,
