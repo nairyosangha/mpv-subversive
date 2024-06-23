@@ -145,64 +145,56 @@ function sub_selector:query(show_info, anilist_data)
     self:display(items)
 end
 
-function sub_selector:display(items)
-    local function to_full_path(subtitle)
-        return string.format("%s/%s", path, subtitle)
-    end
-    local all_subs = util.run_cmd(string.format("ls %q", path))
-    local with_full_path = Sequence(all_subs):map(to_full_path):collect()
-    if #items == 0 then
+function sub_selector:display(subtitles)
+    if #subtitles == 0 then
         mp.osd_message("no matching subs", 3)
         return
     end
-    local function choose_subtitle(sub_menu_item)
-        local selected_sub = with_full_path[sub_menu_item.idx - self.offset]
-        local _, selected_sub_file = mpu.split_path(selected_sub)
-        mp.osd_message(string.format("chose: %s", selected_sub_file), 2)
+
+    local function select_sub(menu_item)
+        if not menu_item._sub_initialized then
+            self.backend:download_subtitle(menu_item.subtitle)
+            menu_item._sub_initialized = true
+        end
+        if menu_item.parent.last_selected then
+            mp.commandv("sub_remove", menu_item.parent.last_selected)
+        end
+        mp.commandv("sub_add", menu_item.subtitle.absolute_path, 'cached', 'autoloader', 'jp')
+        menu_item.parent.last_selected = mp.get_property('sid')
+    end
+
+    local function choose_sub(menu_item)
+        mp.osd_message(string.format("chose: %s", menu_item.subtitle.name), 2)
+        -- TODO we also cp the subtitle file to a local ./subs folder, this should be optional
         local dir, fn = mpu.split_path(mp.get_property("filename/no-ext"))
-        -- TODO this should be configurable
         local subs_path = string.format(dir .. "/subs/")
         if not util.path_exists(subs_path) then
             os.execute(string.format("mkdir %q", subs_path))
         end
-        local sub_fn = table.concat({ subs_path, fn, ".", util.get_extension(selected_sub) })
-        os.execute(string.format("cp %q %q", selected_sub, sub_fn))
-    end
-
-    local function select_subtitle(sub_menu_item)
-        if sub_menu_item.parent.last_selected then
-            mp.commandv("sub_remove", sub_menu_item.parent.last_selected)
-        end
-        mp.commandv("sub_add", with_full_path[sub_menu_item.parent.selected - self.offset], 'cached', 'autoloader', 'jp')
-        sub_menu_item.parent.last_selected = mp.get_property('sid')
+        local sub_fn = table.concat({ subs_path, fn, ".", util.get_extension(menu_item.subtitle.name) })
+        os.execute(string.format("cp %q %q", menu_item.subtitle.absolute_path, sub_fn))
     end
 
     self:clear_items()
-    self:set_header(("Found %s matching files"):format(#all_subs))
+    self:set_header(("Found %s matching files"):format(#subtitles))
     if show_selector.initialized then
         self:add(self.back_item)
     end
     self.last_selected = nil -- store sid of active sub here
-    for _, item in ipairs(items) do
-        local text = item.name
-        if item.is_archive then
+    for _, sub in ipairs(subtitles) do
+        local text = sub.name
+        if self.backend:is_supported_archive(sub.absolute_path) then
             text = "<ENTER to download archive> " .. text
-        self:add_item {
+        end
+        local menu_entry = self:new_item {
             text = text,
             width = mp.get_property("osd-width") - 100,
             font_size = 17,
-            on_selected_cb = 
-
+            on_selected_cb = select_sub,
+            on_chosen_cb = choose_sub,
         }
-    end
-    for _, sub in ipairs(all_subs) do
-        self:add_item {
-            text = sub,
-            width = mp.get_property("osd-width") - 100,
-            font_size = 20,
-            on_selected_cb = select_subtitle,
-            on_chosen_cb = choose_subtitle
-        }
+        menu_entry.subtitle = sub
+        self:add(menu_entry)
     end
     self:open(true)
 end

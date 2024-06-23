@@ -9,7 +9,7 @@ local jimaku = {
 
 ---Extract all subtitles which are available for the given ID
 ---@param show_info table containing title, ep_number and anilist_data
----@return string|nil path to directory containing all matching subs or nil if nothing was found
+---@return table containing all subtitles for the given show
 function jimaku:query_subtitles(show_info)
     local anilist_id = show_info.anilist_data.id
     mp.osd_message(("Finding matching subtitles for AniList ID '%s'"):format(anilist_id), 3)
@@ -30,16 +30,10 @@ function jimaku:query_subtitles(show_info)
 
     local items = {}
     for _, entry in ipairs(entries) do
-        print(("Found matching entry '%s', id: %d"):format(entry.name, entry.id))
-        Sequence(self:get_files(entry.id))
-            :foreach(function(x)
-                x.is_archive = self:is_supported_archive(x.name)
-                x.is_episode_matching = file_filter
-                x.download_cb = function(path) return self:download_subtitle(x, cached_path) end
-                x.download_archive_cb = function() return self:extract_archive(x, show_info) end
-                table.insert(items, x)
-                return x
-            end)
+        for _, file in ipairs(self:get_files(entry.id)) do
+            file.absolute_path = cached_path .. '/' .. file.name
+            table.insert(items, file)
+        end
     end
     return items
 end
@@ -56,10 +50,8 @@ function jimaku:get_files(entry_id)
     return assert(result, err)
 end
 
-function jimaku:download_subtitle(file_entry, path)
-    local filename = path .. '/' .. file_entry.name
-    requests:save(file_entry.url, filename)
-    return filename
+function jimaku:download_subtitle(file_entry)
+    requests:save(file_entry.url, file_entry.absolute_path)
 end
 
 return jimaku
