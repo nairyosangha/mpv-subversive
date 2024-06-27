@@ -48,23 +48,24 @@ function MenuItem:is_selectable()
     return self.is_enabled == true and self.is_visible == true
 end
 
-function MenuItem:draw()
+---@param display_idx number the index at which this item is displayed on screen, this isn't necessarily its own internal idx
+function MenuItem:draw(display_idx)
     self.text = ''
     -- our idx starts at 1 but we want to start at 0 here
-    local x0, y0 = self.parent.pos_x, self.parent.pos_y + ((self.idx-1) * self.height)
+    local x0, y0 = self.parent.pos_x, self.parent.pos_y + ((display_idx-1) * self.height)
     self:new_event()
     self:apply_rect_color()
     self:draw_start()
     self:pos(x0, y0)
     self:rect_cw(0, 0, self.width, self.height)
     self:draw_stop()
-    self:draw_text()
+    self:draw_text(display_idx)
     return self.text
 end
 
-function MenuItem:draw_text()
+function MenuItem:draw_text(display_idx)
     self:new_event()
-    self:pos(self.parent.pos_x + self.parent.padding, self.parent.pos_y + (self.height * (self.idx - 1)) + self.parent.padding)
+    self:pos(self.parent.pos_x + self.parent.padding, self.parent.pos_y + (self.height * (display_idx - 1)) + self.parent.padding)
     self:set_font_size()
     self:apply_text_color()
     self:append(self.display_text)
@@ -96,6 +97,24 @@ function MenuItem:apply_rect_color()
     end
 end
 
+-- returns the visible and selectable item below this one, if any
+function MenuItem:next()
+    for i=self.idx+1, #self.parent.items do
+        if i:is_selectable() then
+            return self.parent.items[i]
+        end
+    end
+end
+
+-- returns the visible and selectable item above this one, if any
+function MenuItem:prev()
+    for i=self.idx-1, 1, -1 do
+        if i:is_selectable() then
+            return self.parent.items[i]
+        end
+    end
+end
+
 function Menu:new(o)
     self.__index = self
     o = o or {}
@@ -103,6 +122,7 @@ function Menu:new(o)
     o.selected = o.selected or 1
     o.canvas_width = o.canvas_width or 1280
     o.canvas_height = o.canvas_height or 720
+    o.on_close_callbacks = {}
     o.pos_x = o.pos_x or 0
     o.pos_y = o.pos_y or 0
     o.padding = o.padding or 5
@@ -150,12 +170,18 @@ function Menu:clear_items(with_redraw)
     end
 end
 
+function Menu:on_close(callback)
+    table.insert(self.on_close_callbacks, callback)
+end
+
 function Menu:draw()
+    local display_idx = 1
     self.text_table = {}
-    for _,i in ipairs(self.items) do
-        -- TODO if we're invisible this index stuff will  not match
-        if i.is_visible then
-            table.insert(self.text_table, i:draw())
+    for i=1, #self.items do
+        local entry = self.items[i]
+        if entry.is_visible then
+            table.insert(self.text_table, entry:draw(display_idx))
+            display_idx = display_idx + 1
         end
     end
     self.items[self.selected]:on_selected_cb()
@@ -224,6 +250,9 @@ end
 function Menu:close()
     for _, val in pairs(self:get_keybindings()) do
         mp.remove_key_binding(val.key, val.key, val.fn)
+    end
+    for _, callback in ipairs(self.on_close_callbacks) do
+        callback(self)
     end
     self:erase()
 end

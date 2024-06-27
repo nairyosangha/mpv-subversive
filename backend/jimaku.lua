@@ -2,14 +2,23 @@ require 'utils.sequence'
 local requests = require 'requests'
 local mp = require 'mp'
 local mpu = require 'mp.utils'
+local scheduler = require 'scheduler.scheduler'
 
 local jimaku = {
-    BASE_URL = "https://jimaku.cc/api/"
+    BASE_URL = "https://jimaku.cc/api/",
+    thread_count = 3,
 }
+
+function jimaku:get_scheduler()
+    if not self.scheduler then
+        self.scheduler = scheduler.new("jimaku.cc", 443, self.thread_count, { ["Authorization"] = self.API_TOKEN })
+    end
+    return self.scheduler
+end
 
 ---Extract all subtitles which are available for the given ID
 ---@param show_info table containing title, ep_number and anilist_data
----@return string|nil path to directory containing all matching subs or nil if nothing was found
+---@return table containing all subtitles for the given show
 function jimaku:query_subtitles(show_info)
     local anilist_id = show_info.anilist_data.id
     mp.osd_message(("Finding matching subtitles for AniList ID '%s'"):format(anilist_id), 3)
@@ -27,22 +36,16 @@ function jimaku:query_subtitles(show_info)
     end
     local cached_path = self:get_cached_path(show_info)
     os.execute(string.format("mkdir -p %q", cached_path))
+
+    local items = {}
     for _, entry in ipairs(entries) do
-        print(("Found matching entry '%s', id: %d"):format(entry.name, entry.id))
-        Sequence(self:get_files(entry.id))
-            :map(function(x)
-                x.is_archive = self:is_supported_archive(x.name)
-                return x
-            end)
-            :filter(file_filter)
-            :foreach(function(file_entry)
-                local fn = self:download_subtitle(file_entry, cached_path)
-                if file_entry.is_archive then
-                    self:extract_archive(fn, show_info)
-                end
-            end)
+        for _, file in ipairs(self:get_files(entry.id)) do
+            file.matching_episode = file_filter(file)
+            file.absolute_path = cached_path .. '/' .. file.name
+            table.insert(items, file)
+        end
     end
-    return cached_path
+    return items
 end
 
 function jimaku:get_files(entry_id)
@@ -57,10 +60,14 @@ function jimaku:get_files(entry_id)
     return assert(result, err)
 end
 
-function jimaku:download_subtitle(file_entry, path)
-    local filename = path .. '/' .. file_entry.name
-    requests:save(file_entry.url, filename)
-    return filename
+function jimaku:download_subtitle(file_entry)
+    local host, path, _ = requests:unpack_url(file_entry.url)
+    local headers = {
+        ["Host"] = host,
+        ["Accept"] = "application/octet-stream",
+        ["Connection"] = "keep-alive",
+    }
+    return self:get_scheduler():schedule(path, headers)
 end
 
 return jimaku

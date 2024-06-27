@@ -12,12 +12,18 @@ OPTS = {
     API_TOKEN = "",
 }
 options.read_options(OPTS, 'sub_loader')
+local backend
 
 local function main()
-    local backend = require("backend.backend"):new(OPTS)
+    backend = require("backend.backend"):new(OPTS)
     mp.add_key_binding("b", "find_sub", function() loader:run(backend) end)
 end
 
 if OPTS.enabled then
     mp.register_event("file-loaded", main)
+    mp.register_event("shutdown", function()
+        if backend and backend.scheduler then
+            backend.scheduler:quit()
+        end
+    end)
 end
