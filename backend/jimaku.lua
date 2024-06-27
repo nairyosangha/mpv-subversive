@@ -2,10 +2,19 @@ require 'utils.sequence'
 local requests = require 'requests'
 local mp = require 'mp'
 local mpu = require 'mp.utils'
+local scheduler = require 'scheduler.scheduler'
 
 local jimaku = {
-    BASE_URL = "https://jimaku.cc/api/"
+    BASE_URL = "https://jimaku.cc/api/",
+    thread_count = 3,
 }
+
+function jimaku:get_scheduler()
+    if not self.scheduler then
+        self.scheduler = scheduler.new("jimaku.cc", 443, self.thread_count, { ["Authorization"] = self.API_TOKEN })
+    end
+    return self.scheduler
+end
 
 ---Extract all subtitles which are available for the given ID
 ---@param show_info table containing title, ep_number and anilist_data
@@ -52,7 +61,13 @@ function jimaku:get_files(entry_id)
 end
 
 function jimaku:download_subtitle(file_entry)
-    requests:save(file_entry.url, file_entry.absolute_path)
+    local host, path, _ = requests:unpack_url(file_entry.url)
+    local headers = {
+        ["Host"] = host,
+        ["Accept"] = "application/octet-stream",
+        ["Connection"] = "keep-alive",
+    }
+    return self:get_scheduler():schedule(path, headers)
 end
 
 return jimaku

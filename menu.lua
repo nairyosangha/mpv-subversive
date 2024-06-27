@@ -122,6 +122,7 @@ function Menu:new(o)
     o.selected = o.selected or 1
     o.canvas_width = o.canvas_width or 1280
     o.canvas_height = o.canvas_height or 720
+    o.on_close_callbacks = {}
     o.pos_x = o.pos_x or 0
     o.pos_y = o.pos_y or 0
     o.padding = o.padding or 5
@@ -169,6 +170,10 @@ function Menu:clear_items(with_redraw)
     end
 end
 
+function Menu:on_close(callback)
+    table.insert(self.on_close_callbacks, callback)
+end
+
 function Menu:draw()
     local display_idx = 1
     self.text_table = {}
@@ -177,7 +182,6 @@ function Menu:draw()
         if entry.is_visible then
             table.insert(self.text_table, entry:draw(display_idx))
             display_idx = display_idx + 1
-            print(entry)
         end
     end
     self.items[self.selected]:on_selected_cb()
@@ -246,6 +250,9 @@ end
 function Menu:close()
     for _, val in pairs(self:get_keybindings()) do
         mp.remove_key_binding(val.key, val.key, val.fn)
+    end
+    for _, callback in ipairs(self.on_close_callbacks) do
+        callback(self)
     end
     self:erase()
 end

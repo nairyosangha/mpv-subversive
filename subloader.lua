@@ -126,6 +126,7 @@ end
 function sub_selector:init(backend)
     self.backend = backend
     self.offset = 2 -- to compensate for the non-sub header menu entry and back option
+    self.showing_all_items = false -- this is toggled when the user toggles the show all files button
     self.back_item = self:new_item {
         text = " >>>   Return to show selection",
         on_chosen_cb = function()
@@ -133,6 +134,19 @@ function sub_selector:init(backend)
             show_selector:open(true)
         end
     }
+    self.toggle_ep_filter = self:new_item {
+        text = " >>>   Toggle showing all files",
+        on_chosen_cb = function()
+            self.showing_all_items = not self.showing_all_items
+            self:display()
+        end
+    }
+    self.download_timer = function()
+        local finished_results = self.backend:get_scheduler():poll()
+        if #finished_results > 0 then
+            self:draw()
+        end
+    end
 end
 
 function sub_selector:query(show_info, anilist_data)
@@ -141,63 +155,93 @@ function sub_selector:query(show_info, anilist_data)
         -- bit of a hack to not display subs for a different show if we manually changed the episode name
         show_info.parsed_title = anilist_data.title and anilist_data.title.romaji or show_info.parsed_title
     end
-    local items = self.backend:query_subtitles(show_info)
-    self:display(items)
+    self.subtitles = self.backend:query_subtitles(show_info)
+    self:display()
 end
 
-function sub_selector:display(subtitles)
-    if #subtitles == 0 then
+function sub_selector:select_item(menu_item)
+    if not menu_item.subtitle._initialized then
+        return
+    end
+    if menu_item.parent.last_selected then
+        mp.commandv("sub_remove", menu_item.parent.last_selected)
+    end
+    mp.commandv("sub_add", menu_item.subtitle.absolute_path, 'cached', 'autoloader', 'jp')
+    menu_item.parent.last_selected = mp.get_property('sid')
+end
+
+function sub_selector:choose_item(menu_item)
+    if not menu_item.subtitle._initialized then
+        return
+    end
+    mp.osd_message(string.format("chose: %s", menu_item.subtitle.name), 2)
+    -- TODO we also cp the subtitle file to a local ./subs folder, this should be optional
+    local dir, fn = mpu.split_path(mp.get_property("filename/no-ext"))
+    local subs_path = string.format(dir .. "/subs/")
+    if not util.path_exists(subs_path) then
+        os.execute(string.format("mkdir %q", subs_path))
+    end
+    local sub_fn = table.concat({ subs_path, fn, ".", util.get_extension(menu_item.subtitle.name) })
+    os.execute(string.format("cp %q %q", menu_item.subtitle.absolute_path, sub_fn))
+end
+
+function sub_selector:display()
+    if #self.subtitles == 0 then
         mp.osd_message("no matching subs", 3)
         return
     end
 
-    local function select_sub(menu_item)
-        if not menu_item._sub_initialized then
-            self.backend:download_subtitle(menu_item.subtitle)
-            menu_item._sub_initialized = true
-        end
-        if menu_item.parent.last_selected then
-            mp.commandv("sub_remove", menu_item.parent.last_selected)
-        end
-        mp.commandv("sub_add", menu_item.subtitle.absolute_path, 'cached', 'autoloader', 'jp')
-        menu_item.parent.last_selected = mp.get_property('sid')
-    end
-
-    local function choose_sub(menu_item)
-        mp.osd_message(string.format("chose: %s", menu_item.subtitle.name), 2)
-        -- TODO we also cp the subtitle file to a local ./subs folder, this should be optional
-        local dir, fn = mpu.split_path(mp.get_property("filename/no-ext"))
-        local subs_path = string.format(dir .. "/subs/")
-        if not util.path_exists(subs_path) then
-            os.execute(string.format("mkdir %q", subs_path))
-        end
-        local sub_fn = table.concat({ subs_path, fn, ".", util.get_extension(menu_item.subtitle.name) })
-        os.execute(string.format("cp %q %q", menu_item.subtitle.absolute_path, sub_fn))
-    end
-
     self:clear_items()
-    self:set_header(("Found %s matching files"):format(#subtitles))
     if show_selector.initialized then
         self:add(self.back_item)
+        self:add(self.toggle_ep_filter)
     end
     self.last_selected = nil -- store sid of active sub here
-    for _, sub in ipairs(subtitles) do
+    local visible_subs_count = 0
+    for _, sub in ipairs(self.subtitles) do
         local text = sub.name
         if self.backend:is_supported_archive(sub.absolute_path) then
             text = "<ENTER to download archive> " .. text
         end
         local menu_entry = self:new_item {
-            text = text,
+            text = '[NOT DOWNLOADED YET] ' .. text,
             width = mp.get_property("osd-width") - 100,
-            is_visible = sub.matching_episode,
+            is_visible = self.showing_all_items and true or sub.matching_episode,
             font_size = 17,
-            on_selected_cb = select_sub,
-            on_chosen_cb = choose_sub,
+            on_selected_cb = function(item) self:select_item(item) end,
+            on_chosen_cb = function(item) self:choose_item(item) end
         }
         menu_entry.subtitle = sub
+        if menu_entry.is_visible then
+            visible_subs_count = visible_subs_count + 1
+            self:download(menu_entry)
+        end
         self:add(menu_entry)
     end
+    self:set_header(("Found %s/%s matching files"):format(visible_subs_count, #self.subtitles))
     self:open(true)
+
+    self.timer = mp.add_periodic_timer(0.5, self.download_timer)
+    self:on_close(function() self.timer:kill() end)
+end
+
+function sub_selector:download(menu_item)
+    if menu_item.subtitle._initialized then
+        menu_item.display_text = menu_item.subtitle.name
+        return
+    end
+    local sub = menu_item.subtitle
+    self.backend:download_subtitle(sub):on_complete(function(response)
+        if response.status_code ~= 200 then
+            return false
+        end
+        local f = assert(io.open(sub.absolute_path, 'wb'))
+        f:write(response.data)
+        f:close()
+        menu_item.subtitle._initialized = true
+        menu_item.display_text = sub.name
+        return true
+    end)
 end
 
 function loader:run(backend)
