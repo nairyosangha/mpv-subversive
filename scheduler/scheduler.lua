@@ -20,24 +20,22 @@ function Scheduler.new(host, port, thread_count, default_headers)
     return setmetatable(sched, { __index = function(t, k) return rawget(t, k) or Scheduler[k] end })
 end
 
-function Scheduler:schedule(path, headers, on_complete_cb)
+function Scheduler:schedule(opts)
     local all_headers = {}
     for k,v in pairs(self.default_headers) do all_headers[k] = v end
-    for k,v in pairs(headers or {}) do all_headers[k] = v end
+    for k,v in pairs(opts.headers or {}) do all_headers[k] = v end
     local init_func = function(thread)
         while true do
-            thread.sock:send(requests:build_GET_request(path, all_headers))
+            thread.sock:send(requests:build_GET_request(opts.path, all_headers))
             local _, res = requests.async:GET(thread.sock)
-            if not res then
-                coroutine.yield(STATUS.IDLE)
-            end
-            return STATUS.IDLE, res
+            return res
         end
     end
     local routine = Routine:new {
-        id = path,
+        id = assert(opts.path, "Missing required 'path'"),
         create_coroutine_func = init_func,
-        on_complete_cb = on_complete_cb
+        on_complete_cb = opts.on_complete_cb,
+        on_incomplete_cb = opts.on_incomplete_cb
     }
     table.insert(self.routines, routine)
     return routine

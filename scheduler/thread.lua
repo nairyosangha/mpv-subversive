@@ -31,13 +31,14 @@ function Thread:resume()
     if not self.routine then
         return
     end
-    local ok, status, result = coroutine.resume(self.routine.co, self)
-    assert(ok, ("Error during running of coroutine: %s"):format(status or ""))
-    if status == STATUS.IDLE then
-        self.status = STATUS.IDLE
-        self.routine = self.routine:unassign()
-        return result
+    local ok, result = coroutine.resume(self.routine.co, self)
+    assert(ok, ("Error during running of coroutine: %s"):format(result or ""))
+    if coroutine.status(self.routine.co) == "suspended" then
+        return self.routine.on_incomplete_cb(result)
     end
+    self.status = STATUS.IDLE
+    self.routine = self.routine:unassign()
+    return result
 end
 
 function Thread.__tostring(x) return ("Thread<ID:%s STATUS:%s>"):format(x.id or 'N/A', STATUS[x.status]) end

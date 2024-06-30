@@ -4,7 +4,10 @@ function Routine:new(opts)
     local r = {}
     r.id = opts.id
     r.create_coroutine_func = assert(opts.create_coroutine_func, "Missing init function for new Routine")
-    r.on_complete_cb = opts.on_complete_cb or function(result) return result end
+    -- takes in the result, returns boolean indicating if the result was valid or not
+    r.on_complete_cb = opts.on_complete_cb or function(result) return true end
+    -- takes in the headers of the request (if they're available, returns nil
+    r.on_incomplete_cb = opts.on_incomplete_cb or function(headers) end
     return setmetatable(r, { __index = self, __tostring = self.__tostring })
 end
 
@@ -25,6 +28,12 @@ end
 
 function Routine:on_complete(func)
     self.on_complete_cb = func
+    return self
+end
+
+function Routine:on_incomplete(func)
+    self.on_incomplete_cb = func
+    return self
 end
 
 function Routine.__tostring(x)

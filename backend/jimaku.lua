@@ -67,7 +67,7 @@ function jimaku:download_subtitle(file_entry)
         ["Accept"] = "application/octet-stream",
         ["Connection"] = "keep-alive",
     }
-    return self:get_scheduler():schedule(path, headers)
+    return self:get_scheduler():schedule { path = path,  headers = headers }
 end
 
 return jimaku

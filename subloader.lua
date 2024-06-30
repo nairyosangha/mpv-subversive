@@ -204,7 +204,7 @@ function sub_selector:display()
             text = "<ENTER to download archive> " .. text
         end
         local menu_entry = self:new_item {
-            text = '[NOT DOWNLOADED YET] ' .. text,
+            text = '[not downloaded]: ' .. text,
             width = mp.get_property("osd-width") - 100,
             is_visible = self.showing_all_items and true or sub.matching_episode,
             font_size = 17,
@@ -221,7 +221,7 @@ function sub_selector:display()
     self:set_header(("Found %s/%s matching files"):format(visible_subs_count, #self.subtitles))
     self:open(true)
 
-    self.timer = mp.add_periodic_timer(0.5, self.download_timer)
+    self.timer = mp.add_periodic_timer(0.2, self.download_timer)
     self:on_close(function() self.timer:kill() end)
 end
 
@@ -241,10 +241,17 @@ function sub_selector:download(menu_item)
         menu_item.subtitle._initialized = true
         menu_item.display_text = sub.name
         return true
+    end):on_incomplete(function(response)
+        local content_length = response.headers and response.headers['content-length']
+        if not content_length then return end
+        local data_downloaded = response.data and #response.data or 0
+        menu_item.display_text = ('[%d%% downloaded]:\t   '):format(100 * data_downloaded / content_length) .. sub.name
+        self:draw() -- download update is always redrawn
     end)
 end
 
 function loader:run(backend)
+    mp.osd_message("Parsing file name..")
     local show_name, episode = backend:parse_current_file(mp.get_property("filename"))
     local initial_show_info = {
         parsed_title = show_name,

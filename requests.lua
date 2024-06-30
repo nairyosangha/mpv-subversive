@@ -95,7 +95,7 @@ function async:GET(client_socket)
         local result, status, partial = client_socket:receive(pattern)
         if status then
             if partial and #partial > 0 then
-                print(("Got partial (size %d), requested %s (current size: %d)"):format(#partial, pattern, #partials[id] or 0))
+                print(("Got partial (size %d), requested %s (current size: %d)"):format(#partial, pattern, partials[id] and #partials[id] or 0))
                 partials[id] = (partials[id] or '') .. partial
             end
             return false, status
@@ -134,6 +134,8 @@ function async:GET(client_socket)
     function response_parser()
         local already_read = partials['response'] and #partials['response'] or 0
         local is_done, data = read(response.headers['content-length'] - already_read, 'response')
+        -- we pass in incomplete data, the coroutine can return incomplete results so we can tell how much we downloaded so far
+        response['data'] = partials['response']
         if is_done then
             response['data'] = data
             parser = nil
@@ -144,7 +146,7 @@ function async:GET(client_socket)
     parser = status_parser
     while parser do
         if not parser() then
-            coroutine.yield()
+            coroutine.yield(response)
         end
     end
     return true, response
