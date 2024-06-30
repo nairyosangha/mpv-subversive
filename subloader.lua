@@ -103,7 +103,9 @@ function show_selector:init(backend, show_info)
     self.initialized = true
 end
 
-function show_selector:display(show_list)
+function show_selector:display()
+    -- only show at most 10 entries, if there are more we probably parsed the show name wrong, plus the list wouldn't render right anyway
+    local show_list = util.table_slice(self.backend:query_shows(self.show_info), 1, 11)
     self:clear_items()
     self:set_header(([[Looking for: %s, episode: %s]]):format(self.show_info.parsed_title, self.show_info.ep_number or 'N/A'))
     self.modify_episode_item.on_chosen_cb = function() self:build_manual_episode_console(show_list) end
@@ -125,13 +127,13 @@ end
 
 function sub_selector:init(backend)
     self.backend = backend
-    self.offset = 2 -- to compensate for the non-sub header menu entry and back option
+    self.offset = 3 -- to compensate for the non-sub header menu entry and back option
     self.showing_all_items = false -- this is toggled when the user toggles the show all files button
     self.back_item = self:new_item {
         text = " >>>   Return to show selection",
         on_chosen_cb = function()
             self:close()
-            show_selector:open(true)
+            show_selector:display()
         end
     }
     self.toggle_ep_filter = self:new_item {
@@ -192,10 +194,12 @@ function sub_selector:display()
     end
 
     self:clear_items()
-    if show_selector.initialized then
-        self:add(self.back_item)
-        self:add(self.toggle_ep_filter)
-    end
+    self:add({}) -- placeholder for header we fill in later
+    self:add(self.back_item)
+    self:add(self.toggle_ep_filter)
+
+    local start_dl = false
+
     self.last_selected = nil -- store sid of active sub here
     local visible_subs_count = 0
     for _, sub in ipairs(self.subtitles) do
@@ -204,7 +208,7 @@ function sub_selector:display()
             text = "<ENTER to download archive> " .. text
         end
         local menu_entry = self:new_item {
-            text = '[not downloaded]: ' .. text,
+            text = text,
             width = mp.get_property("osd-width") - 100,
             is_visible = self.showing_all_items and true or sub.matching_episode,
             font_size = 17,
@@ -214,15 +218,22 @@ function sub_selector:display()
         menu_entry.subtitle = sub
         if menu_entry.is_visible then
             visible_subs_count = visible_subs_count + 1
-            self:download(menu_entry)
+            if not sub._initialized then
+                start_dl = true
+                menu_entry.display_text = '[not downloaded]:  ' .. text
+                self:download(menu_entry)
+            else
+            end
         end
         self:add(menu_entry)
     end
     self:set_header(("Found %s/%s matching files"):format(visible_subs_count, #self.subtitles))
     self:open(true)
 
-    self.timer = mp.add_periodic_timer(0.2, self.download_timer)
-    self:on_close(function() self.timer:kill() end)
+    if start_dl then
+        self.timer = mp.add_periodic_timer(0.2, self.download_timer)
+        self:on_close(function() self.timer:kill() end)
+    end
 end
 
 function sub_selector:download(menu_item)
@@ -268,7 +279,16 @@ function loader:run(backend)
     -- first check if we already have a save path for this episode
     local cached_path = backend:get_cached_path(initial_show_info)
     if util.path_exists(cached_path) then
-        return sub_selector:display(cached_path)
+        local cached_subs = {}
+        for _,file in ipairs(util.run_cmd(("ls %q"):format(cached_path))) do
+            table.insert(cached_subs, {
+                name = file,
+                absolute_path = cached_path .. '/' .. file,
+                _initialized = true,
+            })
+        end
+        sub_selector.subtitles = cached_subs
+        return sub_selector:display()
     end
 
     -- look for .anilist.id file to skip the jimaku lookup
@@ -277,9 +297,7 @@ function loader:run(backend)
         return sub_selector:query(initial_show_info, { id = saved_id })
     end
 
-    -- only show at most 10 entries, if there are more we probably parsed the show name wrong, plus the list wouldn't render right anyway
-    local matching_shows = util.table_slice(backend:query_shows(initial_show_info), 1, 11)
-    show_selector:display(matching_shows)
+    show_selector:display()
 end
 
 return loader
