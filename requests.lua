@@ -5,7 +5,9 @@ local socket = require("socket")
 local ssl = require("ssl")
 local ltn12 = require("ltn12")
 
+local async = {}
 local requests = {
+    async = async,
     err_msg = "Invalid %s request: %s",
     ssl_params = {
         mode = "client",
@@ -16,6 +18,7 @@ local requests = {
     },
     socket_hosts = {}
 }
+
 
 
 ---@return string host,string path,number port
@@ -78,54 +81,73 @@ end
 
 ---@param client_socket table socket which is ready to be read from
 ---@return boolean coroutine_result, table|nil response (if we finished)
-function requests:GET_async(client_socket)
-    local parser, parse_header, parse_data
-    local response_headers, response_data = {}, ''
-    local status_code, status_message
-    function parse_header()
-        local result, status, partial = client_socket:receive('*l')
-        assert(not partial or #partial == 0, "INCOMPLETE HEADER") -- TODO?
+function async:GET(client_socket)
+    local parser, status_parser, header_parser, response_parser
+    local partials = {}
+
+    local response = { headers = {} }
+
+    ---@param pattern string request data from socket
+    ---@param id string to store/identify partial content
+    ---@return boolean indicating if we're done
+    ---@return string with the read data (if we're done)
+    local function read(pattern, id)
+        local result, status, partial = client_socket:receive(pattern)
         if status then
-            return status
+            if partial and #partial > 0 then
+                print(("Got partial (size %d), requested %s (current size: %d)"):format(#partial, pattern, #partials[id] or 0))
+                partials[id] = (partials[id] or '') .. partial
+            end
+            return false, status
         end
-        if #result == 0 then
-            parser = parse_data
-            return
+        if partials[id] then
+            result = partials[id] .. result
+            partials[id] = nil
         end
-        local _, _, key, value = result:find("^([^:]+): (.+)$")
-        if key then
-            response_headers[key] = value
-        else
-            status_code, status_message = socket.skip(2, result:find("^HTTP/1.1 (%d+) ([%s%w]+)$"))
+        return true, result
+    end
+
+    function status_parser()
+        local is_done, status_line = read("*l", "status_line")
+        if is_done then
+            local _, _, status_code, status_message = status_line:find("^HTTP/1.1 (%d+) ([%s%w]+)$")
+            response['status_code'] = tonumber(status_code)
+            response['status_message'] = status_message
+            parser = header_parser
+        end
+        return is_done
+    end
+
+    function header_parser()
+        local is_done, header = read("*l", "header")
+        if is_done then
+            if #header == 0 then
+                parser = response_parser
+            else
+                local _, _, key, value = header:find("^([^:]+): (.+)$")
+                response['headers'][key] = value
+            end
+            return true
         end
     end
 
-    function parse_data()
-        local result, status, partial = client_socket:receive(response_headers['content-length'] - #response_data)
-        if partial and #partial > 0 then
-            response_data = response_data .. partial
-            print(("Got partial data of length %d, we requested %d (current size: %d)"):format(#partial, response_headers['content-length'], #response_data))
+    function response_parser()
+        local already_read = partials['response'] and #partials['response'] or 0
+        local is_done, data = read(response.headers['content-length'] - already_read, 'response')
+        if is_done then
+            response['data'] = data
+            parser = nil
+            return true
         end
-        if status then
-            return status
-        end
-        response_data = response_data .. result
-        parser = nil
     end
 
-    parser = parse_header
+    parser = status_parser
     while parser do
-        local status = parser()
-        if status == "wantread" then
+        if not parser() then
             coroutine.yield()
         end
     end
-    return true, {
-        data = response_data,
-        headers = response_headers,
-        status_code = tonumber(status_code),
-        status_message = status_message
-    }
+    return true, response
 end
 
 function requests:GET(options)

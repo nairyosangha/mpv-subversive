@@ -31,7 +31,8 @@ function Thread:resume()
     if not self.routine then
         return
     end
-    local _, status, result = coroutine.resume(self.routine.co, self)
+    local ok, status, result = coroutine.resume(self.routine.co, self)
+    assert(ok, ("Error during running of coroutine: %s"):format(status or ""))
     if status == STATUS.IDLE then
         self.status = STATUS.IDLE
         self.routine = self.routine:unassign()

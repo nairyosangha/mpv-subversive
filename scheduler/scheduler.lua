@@ -27,7 +27,7 @@ function Scheduler:schedule(path, headers, on_complete_cb)
     local init_func = function(thread)
         while true do
             thread.sock:send(requests:build_GET_request(path, all_headers))
-            local _, res = requests:GET_async(thread.sock)
+            local _, res = requests.async:GET(thread.sock)
             if not res then
                 coroutine.yield(STATUS.IDLE)
             end
@@ -46,7 +46,7 @@ end
 function Scheduler:assign_thread(routine)
     for _,thread in ipairs(self.threads) do
         if thread:assign(routine) then
-            print(("Assigning routine %s to thread %s"):format(tostring(routine), tostring(thread)))
+            print(("Assigned routine %s to thread %s"):format(tostring(routine), tostring(thread)))
             return thread
         end
     end
