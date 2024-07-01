@@ -93,11 +93,11 @@ function show_selector:init(backend, show_info)
     self.show_info = show_info
     self.offset = 3 -- to compensate for the header, show and episode lookup entries
     self.modify_show_item = self:new_item {
-        text = " >>>   Text-based lookup",
+        display_text = " >>>   Text-based lookup",
         on_chosen_cb = function() self:build_manual_lookup_console() end
     }
     self.modify_episode_item = self:new_item {
-        text = (" >>>   Modify episode number"):format(show_info.ep_number or 'N/A'),
+        display_text = (" >>>   Modify episode number"):format(show_info.ep_number or 'N/A'),
         on_chosen_cb = nil -- we set this in the display when we actually have the list of shows
     }
     self.initialized = true
@@ -114,30 +114,29 @@ function show_selector:display()
 
     for _,s in ipairs(show_list) do
         self:add_item {
-            text = build_menu_entry(s),
+            display_text = build_menu_entry(s),
             on_chosen_cb = function(item)
                 local anilist_data = show_list[item.idx - self.offset]
                 sub_selector:query(self.show_info, anilist_data)
             end
         }
     end
-    self.selected = 2
-    self:open(true)
+    self:open()
 end
 
 function sub_selector:init(backend)
     self.backend = backend
     self.offset = 3 -- to compensate for the non-sub header menu entry and back option
     self.showing_all_items = false -- this is toggled when the user toggles the show all files button
-    self.back_item = self:new_item {
-        text = " >>>   Return to show selection",
+    self:add_option {
+        display_text = " >>>   Return to show selection",
         on_chosen_cb = function()
             self:close()
             show_selector:display()
         end
     }
-    self.toggle_ep_filter = self:new_item {
-        text = " >>>   Toggle showing all files",
+    self:add_option {
+        display_text = " >>>   Toggle showing all files",
         on_chosen_cb = function()
             self.showing_all_items = not self.showing_all_items
             self:display()
@@ -194,10 +193,6 @@ function sub_selector:display()
     end
 
     self:clear_items()
-    self:add({}) -- placeholder for header we fill in later
-    self:add(self.back_item)
-    self:add(self.toggle_ep_filter)
-
     local start_dl = false
 
     self.last_selected = nil -- store sid of active sub here
@@ -208,7 +203,7 @@ function sub_selector:display()
             text = "<ENTER to download archive> " .. text
         end
         local menu_entry = self:new_item {
-            text = text,
+            display_text = text,
             width = mp.get_property("osd-width") - 100,
             is_visible = self.showing_all_items and true or sub.matching_episode,
             font_size = 17,
@@ -228,7 +223,7 @@ function sub_selector:display()
         self:add(menu_entry)
     end
     self:set_header(("Found %s/%s matching files"):format(visible_subs_count, #self.subtitles))
-    self:open(true)
+    self:open()
 
     if start_dl then
         self.timer = mp.add_periodic_timer(0.2, self.download_timer)
