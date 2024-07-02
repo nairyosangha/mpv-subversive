@@ -175,14 +175,16 @@ function sub_selector:choose_item(menu_item)
         return
     end
     mp.osd_message(string.format("chose: %s", menu_item.subtitle.name), 2)
-    -- TODO we also cp the subtitle file to a local ./subs folder, this should be optional
-    local dir, fn = mpu.split_path(mp.get_property("filename/no-ext"))
-    local subs_path = string.format(dir .. "/subs/")
-    if not util.path_exists(subs_path) then
-        os.execute(string.format("mkdir %q", subs_path))
+    if self.backend.chosen_sub_dir and #self.backend.chosen_sub_dir > 0 then
+        local dir, fn = mpu.split_path(mp.get_property("path"))
+        local sub_path = self.backend.chosen_sub_dir
+        if sub_path:sub(1, 1) == '.' then -- relative path
+            sub_path = dir .. '/' .. sub_path .. '/'
+        end
+        os.execute(("mkdir -p %q"):format(sub_path))
+        local sub_fn = table.concat({ sub_path, fn:gsub("[^.]+$", ""), util.get_extension(menu_item.subtitle.name) })
+        os.execute(("cp %q %q"):format(menu_item.subtitle.absolute_path, sub_fn))
     end
-    local sub_fn = table.concat({ subs_path, fn, ".", util.get_extension(menu_item.subtitle.name) })
-    os.execute(string.format("cp %q %q", menu_item.subtitle.absolute_path, sub_fn))
 end
 
 function sub_selector:display()

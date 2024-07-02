@@ -4,6 +4,9 @@ local loader = require('subloader')
 
 OPTS = {
     enabled = true,
+    -- the selected subtitle file is stored in the directory below. Leave it blank to skip this step
+    -- If the path is relative, this is interpreted as relative to the currently playing file
+    chosen_sub_dir = './subs',
     cache_directory = "/tmp/subloader",
     subtitle_backend = 'jimaku', -- can be either 'jimaku' or 'offline'
     -- the following options are used when using the 'offline' backend
