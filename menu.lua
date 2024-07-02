@@ -103,7 +103,6 @@ function Menu:new(o)
     o.pos_y = o.pos_y or 0
     o.padding = o.padding or 5
     o.visible_item_count = o.visible_item_count or 5
-    o.visible_offset = 0
     return setmetatable(o, self)
 end
 

@@ -6,8 +6,8 @@ function Routine:new(opts)
     r.create_coroutine_func = assert(opts.create_coroutine_func, "Missing init function for new Routine")
     -- takes in the result, returns boolean indicating if the result was valid or not
     r.on_complete_cb = opts.on_complete_cb or function(result) return true end
-    -- takes in the headers of the request (if they're available, returns nil
-    r.on_incomplete_cb = opts.on_incomplete_cb or function(headers) end
+    -- takes in the result, which is still incomplete, this can be used to check the headers to get a % downloaded
+    r.on_incomplete_cb = opts.on_incomplete_cb or function(result) end
     return setmetatable(r, { __index = self, __tostring = self.__tostring })
 end
 
