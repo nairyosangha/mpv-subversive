@@ -180,9 +180,6 @@ function Menu:draw()
     self.text_table = {}
     for i,item in ipairs(self:get_visible_items()) do
         table.insert(self.text_table, item:draw(i))
-        if item.is_selected then
-            item:on_selected_cb()
-        end
     end
     mp.set_osd_ass(self.canvas_width, self.canvas_height, table.concat(self.text_table, "\n"))
 end
@@ -195,7 +192,9 @@ function Menu:up()
     local before = self.selected
     while self.selected > 1 do
         self.selected = self.selected - 1
-        if self:get_selected_item():is_selectable() then
+        local item = self:get_selected_item()
+        if item:is_selectable() then
+            item:on_selected_cb()
             return self:draw()
         end
     end
@@ -207,7 +206,9 @@ function Menu:down()
     local before = self.selected
     while self.selected < count do
         self.selected = self.selected + 1
-        if self:get_selected_item():is_selectable() then
+        local item = self:get_selected_item()
+        if item:is_selectable() then
+            item:on_selected_cb()
             return self:draw()
         end
     end
