@@ -11,7 +11,7 @@ MenuItem.DEFAULT_INACTIVE_COLOR = "AAAAAA"
 MenuItem.DEFAULT_BORDER_COLOR = "000000"
 MenuItem.DEFAULT_TEXT_COLOR = "FFFFFFFF"
 MenuItem.DEFAULT_FONT_SIZE = 25
-MenuItem.DEFAULT_WIDTH = 500
+MenuItem.DEFAULT_WIDTH = 600
 MenuItem.DEFAULT_HEIGHT = 40
 
 function MenuItem:new(opts)
@@ -45,13 +45,11 @@ function MenuItem:is_selectable()
     return self.is_enabled == true and self.is_visible == true
 end
 
----@param display_idx number the index at which this item is displayed on screen, this isn't necessarily its own internal idx
 function MenuItem:draw(display_idx)
     self.text = ''
-    -- our idx starts at 1 but we want to start at 0 here
     local x0, y0 = self.parent.pos_x, self.parent.pos_y + ((display_idx-1) * self.height)
     self:new_event()
-    self:apply_rect_color(display_idx)
+    self:apply_rect_color()
     self:draw_start()
     self:pos(x0, y0)
     self:rect_cw(0, 0, self.width, self.height)

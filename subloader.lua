@@ -13,8 +13,8 @@ local function build_menu_entry(anilist_media)
     return ("[%s]  %s  (%s)"):format(anilist_media.format, anilist_media.title.romaji, year_string)
 end
 
-local show_selector = menu:new { pos_x = 50, pos_y = 50, rect_width = 600 }
-local sub_selector = menu:new { pos_x = 50, pos_y = 50, rect_width = 600 }
+local show_selector = menu:new { pos_x = 50, pos_y = 50 }
+local sub_selector = menu:new { pos_x = 50, pos_y = 50 }
 
 function show_selector:build_manual_episode_console()
     mpi.get {
@@ -103,14 +103,14 @@ function show_selector:init(backend, show_info)
     self.initialized = true
 end
 
-function show_selector:display()
+function show_selector:display(show_list)
     -- only show at most 10 entries, if there are more we probably parsed the show name wrong, plus the list wouldn't render right anyway
-    local show_list = util.table_slice(self.backend:query_shows(self.show_info), 1, 11)
+    self.show_list = show_list and show_list or util.table_slice(self.backend:query_shows(self.show_info), 1, 11)
     self:clear_choices()
     self:set_header(([[Looking for: %s, episode: %s]]):format(self.show_info.parsed_title, self.show_info.ep_number or 'N/A'))
     self.modify_episode_item.on_chosen_cb = function() self:build_manual_episode_console() end
 
-    for _,s in ipairs(show_list) do
+    for _,s in ipairs(self.show_list) do
         self:add_item {
             display_text = build_menu_entry(s),
             on_chosen_cb = function(item)
@@ -130,7 +130,7 @@ function sub_selector:init(backend)
         on_chosen_cb = function()
             self:close()
             self.showing_all_choices = false
-            show_selector:display()
+            show_selector:display(show_selector.show_list)
         end
     }
     self.show_all_toggle = self.show_all_toggle or self:add_option {
@@ -266,22 +266,6 @@ function loader:run(backend)
     print(("show title: '%s', episode number: '%d'"):format(show_name, episode or -1))
     show_selector:init(backend, initial_show_info)
     sub_selector:init(backend)
-
-    -- first check if we already have a save path for this episode
-    local cached_path = backend:get_cached_path(initial_show_info)
-    if util.path_exists(cached_path) then
-        local cached_subs = {}
-        for _,file in ipairs(util.run_cmd(("ls %q"):format(cached_path))) do
-            table.insert(cached_subs, {
-                name = file,
-                absolute_path = cached_path .. '/' .. file,
-                _initialized = true,
-            })
-        end
-        sub_selector.subtitles = cached_subs
-        table.sort(sub_selector.subtitles, function(a,b) return a.name < b.name end)
-        return sub_selector:display()
-    end
 
     -- look for .anilist.id file to skip the jimaku lookup
     local saved_id = util.open_file("./.anilist.id", 'r', function(f) return f:read("*l") end)
