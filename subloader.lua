@@ -16,7 +16,7 @@ end
 local show_selector = menu:new { pos_x = 50, pos_y = 50, rect_width = 500 }
 local sub_selector = menu:new { pos_x = 50, pos_y = 50, rect_width = 600 }
 
-function show_selector:build_manual_episode_console(show_list)
+function show_selector:build_manual_episode_console()
     mpi.get {
         prompt = "Please type the correct episode number: ",
         submit = function(episode_text)
@@ -24,7 +24,7 @@ function show_selector:build_manual_episode_console(show_list)
             if ep_number then
                 mpi.terminate()
                 self.show_info.ep_number = ep_number
-                self:display(show_list)
+                self:display()
             end
         end,
         edited = function(episode_text)
@@ -91,12 +91,12 @@ end
 function show_selector:init(backend, show_info)
     self.backend = backend
     self.show_info = show_info
-    self.offset = 3 -- to compensate for the header, show and episode lookup entries
-    self.modify_show_item = self:new_item {
+    self.options = {}
+    self.modify_show_item = self.modify_show_item or self:add_option {
         display_text = " >>>   Text-based lookup",
         on_chosen_cb = function() self:build_manual_lookup_console() end
     }
-    self.modify_episode_item = self:new_item {
+    self.modify_episode_item = self.modify_episode_item or self:add_option {
         display_text = (" >>>   Modify episode number"):format(show_info.ep_number or 'N/A'),
         on_chosen_cb = nil -- we set this in the display when we actually have the list of shows
     }
@@ -108,18 +108,16 @@ function show_selector:display()
     local show_list = util.table_slice(self.backend:query_shows(self.show_info), 1, 11)
     self:clear_items()
     self:set_header(([[Looking for: %s, episode: %s]]):format(self.show_info.parsed_title, self.show_info.ep_number or 'N/A'))
-    self.modify_episode_item.on_chosen_cb = function() self:build_manual_episode_console(show_list) end
-    self:add(self.modify_show_item)
-    self:add(self.modify_episode_item)
+    self.modify_episode_item.on_chosen_cb = function() self:build_manual_episode_console() end
 
     for _,s in ipairs(show_list) do
         self:add_item {
             display_text = build_menu_entry(s),
             on_chosen_cb = function(item)
-                local anilist_data = show_list[item.idx - self.offset]
-                sub_selector:query(self.show_info, anilist_data)
+                sub_selector:query(self.show_info, item.anilist_data)
             end
         }
+        self.items[#self.items].anilist_data = s
     end
     self:open()
 end
@@ -128,14 +126,14 @@ function sub_selector:init(backend)
     self.backend = backend
     self.offset = 3 -- to compensate for the non-sub header menu entry and back option
     self.showing_all_items = false -- this is toggled when the user toggles the show all files button
-    self:add_option {
+    self.go_back_option = self.go_back_option or self:add_option {
         display_text = " >>>   Return to show selection",
         on_chosen_cb = function()
             self:close()
             show_selector:display()
         end
     }
-    self:add_option {
+    self.show_all_toggle = self.show_all_toggle or self:add_option {
         display_text = " >>>   Toggle showing all files",
         on_chosen_cb = function()
             self.showing_all_items = not self.showing_all_items
@@ -148,6 +146,10 @@ function sub_selector:init(backend)
             self:draw()
         end
     end
+    self:on_close(function()
+        self.showing_all_items = false
+
+    end)
 end
 
 function sub_selector:query(show_info, anilist_data)
@@ -157,6 +159,7 @@ function sub_selector:query(show_info, anilist_data)
         show_info.parsed_title = anilist_data.title and anilist_data.title.romaji or show_info.parsed_title
     end
     self.subtitles = self.backend:query_subtitles(show_info)
+    table.sort(self.subtitles, function(a,b) return a.name < b.name end)
     self:display()
 end
 
@@ -269,8 +272,6 @@ function loader:run(backend)
     show_selector:init(backend, initial_show_info)
     sub_selector:init(backend)
 
-    local show_matching_subtitles, get_show_id
-
     -- first check if we already have a save path for this episode
     local cached_path = backend:get_cached_path(initial_show_info)
     if util.path_exists(cached_path) then
@@ -283,6 +284,7 @@ function loader:run(backend)
             })
         end
         sub_selector.subtitles = cached_subs
+        table.sort(sub_selector.subtitles, function(a,b) return a.name < b.name end)
         return sub_selector:display()
     end
 

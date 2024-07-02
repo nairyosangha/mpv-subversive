@@ -28,6 +28,7 @@ function MenuItem:new(opts)
     new.font_size = opts.font_size or self.DEFAULT_FONT_SIZE
     new.width = opts.width or self.DEFAULT_WIDTH
     new.height = opts.height or self.DEFAULT_HEIGHT
+    new.is_selected = false
     return setmetatable(new, {
         __index = function(t, k) return rawget(t, k) or self[k] end,
         __tostring = function(x)
@@ -84,13 +85,9 @@ function MenuItem:apply_text_color()
     self:set_text_color(self.text_color)
 end
 
-function MenuItem:apply_rect_color(display_idx)
+function MenuItem:apply_rect_color()
     self:set_border_color(self.border_color)
-    if display_idx == self.parent.selected then
-        self:set_text_color(self.active_color)
-    else
-        self:set_text_color(self.inactive_color)
-    end
+    self:set_text_color(self.is_selected and self.active_color or self.inactive_color)
 end
 
 function Menu:new(o)
@@ -99,13 +96,14 @@ function Menu:new(o)
     o.header = o.header
     o.options = o.options or {}
     o.items = o.items or {}
-    o.selected = o.selected or 1
     o.canvas_width = o.canvas_width or 1280
     o.canvas_height = o.canvas_height or 720
     o.on_close_callbacks = {}
     o.pos_x = o.pos_x or 0
     o.pos_y = o.pos_y or 0
     o.padding = o.padding or 5
+    o.visible_item_count = o.visible_item_count or 5
+    o.visible_offset = 0
     return setmetatable(o, self)
 end
 
@@ -131,19 +129,19 @@ function Menu:add(item)
 end
 
 function Menu:add_item(item_opts)
-    table.insert(self.items, MenuItem:new(item_opts))
+    self:add(self:new_item(item_opts))
 end
 
 function Menu:add_option(item_opts)
     local opt = self:new_item(item_opts)
     table.insert(self.options, opt)
+    return opt
 end
 
 function Menu:clear_items(with_redraw)
     for _=1, #self.items do
         table.remove(self.items, 1)
     end
-    self.selected = 1
     if with_redraw then
         self:draw()
     end
@@ -154,25 +152,38 @@ function Menu:on_close(callback)
 end
 
 function Menu:get_visible_items()
-    local visible_items = {}
-    if self.header then table.insert(visible_items, self.header) end
-    for _,opt in ipairs(self.options) do
-        table.insert(visible_items, opt)
+    local function is_within_window(item_idx)
+        return math.abs(item_idx + #self.options - self.selected - 1) <= self.visible_item_count
     end
-    for _,item in ipairs(self.items) do
-        if item.is_visible then
+
+    local current_selection = self:get_selected_item()
+    local visible_items = {}
+    table.insert(visible_items, self.header)
+    for _,option in ipairs(self.options) do
+        table.insert(visible_items, option)
+        option.is_selected = option == current_selection
+    end
+    local non_item_size = #visible_items
+    for i,item in ipairs(self.items) do
+        -- when we're selecting an option item the `is_within_window` call does not work
+        if item.is_visible and (self.selected <= #self.options or is_within_window(i)) then
             table.insert(visible_items, item)
+        end
+        item.is_selected = self.selected == i + #self.options
+        if #visible_items == self.visible_item_count + non_item_size then
+            break
         end
     end
     return visible_items
 end
 
-function Menu:draw(visible_items)
-    visible_items = visible_items or self:get_visible_items()
+function Menu:draw()
     self.text_table = {}
-    for display_idx, item in ipairs(visible_items) do
-        table.insert(self.text_table, item:draw(display_idx))
-        if display_idx == self.selected then item:on_selected_cb() end
+    for i,item in ipairs(self:get_visible_items()) do
+        table.insert(self.text_table, item:draw(i))
+        if item.is_selected then
+            item:on_selected_cb()
+        end
     end
     mp.set_osd_ass(self.canvas_width, self.canvas_height, table.concat(self.text_table, "\n"))
 end
@@ -182,22 +193,35 @@ function Menu:erase()
 end
 
 function Menu:up()
-    local visible = self:get_visible_items()
-    self.selected = self.selected == 1 and #visible or self.selected - 1
-    if not visible[self.selected]:is_selectable() then return self:up() end
-    self:draw(visible)
+    local before = self.selected
+    while self.selected > 1 do
+        self.selected = self.selected - 1
+        if self:get_selected_item():is_selectable() then
+            return self:draw()
+        end
+    end
+    self.selected = before
 end
 
 function Menu:down()
-    local visible = self:get_visible_items()
-    self.selected = self.selected == #visible and 1 or self.selected + 1
-    if not visible[self.selected]:is_selectable() then return self:down() end
-    self:draw(visible)
+    local count = #self.options + #self.items
+    local before = self.selected
+    while self.selected < count do
+        self.selected = self.selected + 1
+        if self:get_selected_item():is_selectable() then
+            return self:draw()
+        end
+    end
+    self.selected = before
+end
+
+function Menu:get_selected_item()
+    return self.options[self.selected] or self.items[self.selected - #self.options]
 end
 
 function Menu:act()
     self:close()
-    self.items[self.selected]:on_chosen_cb()
+    self:get_selected_item():on_chosen_cb()
 end
 
 function Menu:get_keybindings()
@@ -215,7 +239,7 @@ function Menu:get_keybindings()
 end
 
 function Menu:open()
-    self.selected = self.header and 2 or 1
+    self.selected = self.selected or 1
     for _, val in pairs(self:get_keybindings()) do
         mp.add_forced_key_binding(val.key, val.key, val.fn)
     end
