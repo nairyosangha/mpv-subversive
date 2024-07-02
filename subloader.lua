@@ -13,7 +13,7 @@ local function build_menu_entry(anilist_media)
     return ("[%s]  %s  (%s)"):format(anilist_media.format, anilist_media.title.romaji, year_string)
 end
 
-local show_selector = menu:new { pos_x = 50, pos_y = 50, rect_width = 500 }
+local show_selector = menu:new { pos_x = 50, pos_y = 50, rect_width = 600 }
 local sub_selector = menu:new { pos_x = 50, pos_y = 50, rect_width = 600 }
 
 function show_selector:build_manual_episode_console()
@@ -203,7 +203,6 @@ function sub_selector:display()
         end
         local menu_entry = self:new_item {
             display_text = text,
-            width = mp.get_property("osd-width") - 100,
             is_visible = self.showing_all_choices and true or sub.matching_episode,
             font_size = 17,
             on_selected_cb = function(item) self:select_item(item) end,

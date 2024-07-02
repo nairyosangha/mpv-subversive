@@ -151,29 +151,41 @@ function Menu:on_close(callback)
 end
 
 function Menu:get_visible_items()
-    local function is_within_window(item_idx)
-        return math.abs(item_idx + #self.options - self.selected - 1) <= self.visible_item_count
+    local current_selection = self:get_selected_item()
+    local displayed_items = {}
+    table.insert(displayed_items, self.header)
+    for _,option in ipairs(self.options) do
+        table.insert(displayed_items, option)
+    end
+    local visible_selected_idx = 1
+    for _,item in ipairs(self.choices) do
+        if item.is_visible then
+            if item == current_selection then
+                break
+            end
+            visible_selected_idx = visible_selected_idx + 1
+        end
     end
 
-    local current_selection = self:get_selected_item()
-    local visible_items = {}
-    table.insert(visible_items, self.header)
-    for _,option in ipairs(self.options) do
-        table.insert(visible_items, option)
-        option.is_selected = option == current_selection
+    local function is_within_window(item_idx)
+        print(("selected idx: %d, visible_selected_idx: %d, visible_item_count: %d"):format(item_idx + #self.options, visible_selected_idx, self.visible_item_count))
+        return math.abs(item_idx - visible_selected_idx - 1) <= self.visible_item_count
     end
-    local non_item_size = #visible_items
-    for i,item in ipairs(self.choices) do
+
+    local non_item_size, visible_idx = #displayed_items, 0
+    for _,item in ipairs(self.choices) do
         -- when we're selecting an option item the `is_within_window` call does not work
-        if item.is_visible and (self.selected <= #self.options or is_within_window(i)) then
-            table.insert(visible_items, item)
+        if item.is_visible then
+            visible_idx = visible_idx + 1
+            if(self.selected <= #self.options or is_within_window(visible_idx)) then
+                table.insert(displayed_items, item)
+            end
         end
-        item.is_selected = self.selected == i + #self.options
-        if #visible_items == self.visible_item_count + non_item_size then
+        if #displayed_items == self.visible_item_count + non_item_size then
             break
         end
     end
-    return visible_items
+    return displayed_items
 end
 
 function Menu:draw()
@@ -189,30 +201,36 @@ function Menu:erase()
 end
 
 function Menu:up()
-    local before = self.selected
+    local before_idx, before_item = self.selected, self:get_selected_item()
     while self.selected > 1 do
         self.selected = self.selected - 1
         local item = self:get_selected_item()
         if item:is_selectable() then
             item:on_selected_cb()
+            item.is_selected = true
+            before_item.is_selected = false
             return self:draw()
         end
     end
-    self.selected = before
+    self.selected = before_idx
+    before_item.is_selected = true
 end
 
 function Menu:down()
-    local count = #self.options + #self.items
-    local before = self.selected
+    local count = #self.options + #self.choices
+    local before_idx, before_item = self.selected, self:get_selected_item()
     while self.selected < count do
         self.selected = self.selected + 1
         local item = self:get_selected_item()
         if item:is_selectable() then
             item:on_selected_cb()
+            item.is_selected = true
+            before_item.is_selected = false
             return self:draw()
         end
     end
-    self.selected = before
+    self.selected = before_idx
+    before_item.is_selected = true
 end
 
 function Menu:get_selected_item()
@@ -240,6 +258,7 @@ end
 
 function Menu:open()
     self.selected = self.selected or 1
+    self:get_selected_item().is_selected = true
     for _, val in pairs(self:get_keybindings()) do
         mp.add_forced_key_binding(val.key, val.key, val.fn)
     end
