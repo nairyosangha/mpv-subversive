@@ -95,7 +95,7 @@ function Menu:new(o)
     o = o or {}
     o.header = o.header
     o.options = o.options or {}
-    o.items = o.items or {}
+    o.choices = o.choices or {}
     o.canvas_width = o.canvas_width or 1280
     o.canvas_height = o.canvas_height or 720
     o.on_close_callbacks = {}
@@ -123,8 +123,8 @@ function Menu:new_item(item_opts)
     return new
 end
 
-function Menu:add(item)
-    table.insert(self.items, item)
+function Menu:add(choice)
+    table.insert(self.choices, choice)
 end
 
 function Menu:add_item(item_opts)
@@ -137,9 +137,9 @@ function Menu:add_option(item_opts)
     return opt
 end
 
-function Menu:clear_items(with_redraw)
-    for _=1, #self.items do
-        table.remove(self.items, 1)
+function Menu:clear_choices(with_redraw)
+    for _=1, #self.choices do
+        table.remove(self.choices, 1)
     end
     if with_redraw then
         self:draw()
@@ -163,7 +163,7 @@ function Menu:get_visible_items()
         option.is_selected = option == current_selection
     end
     local non_item_size = #visible_items
-    for i,item in ipairs(self.items) do
+    for i,item in ipairs(self.choices) do
         -- when we're selecting an option item the `is_within_window` call does not work
         if item.is_visible and (self.selected <= #self.options or is_within_window(i)) then
             table.insert(visible_items, item)
@@ -216,7 +216,7 @@ function Menu:down()
 end
 
 function Menu:get_selected_item()
-    return self.options[self.selected] or self.items[self.selected - #self.options]
+    return self.options[self.selected] or self.choices[self.selected - #self.options]
 end
 
 function Menu:act()

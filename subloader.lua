@@ -106,7 +106,7 @@ end
 function show_selector:display()
     -- only show at most 10 entries, if there are more we probably parsed the show name wrong, plus the list wouldn't render right anyway
     local show_list = util.table_slice(self.backend:query_shows(self.show_info), 1, 11)
-    self:clear_items()
+    self:clear_choices()
     self:set_header(([[Looking for: %s, episode: %s]]):format(self.show_info.parsed_title, self.show_info.ep_number or 'N/A'))
     self.modify_episode_item.on_chosen_cb = function() self:build_manual_episode_console() end
 
@@ -117,26 +117,26 @@ function show_selector:display()
                 sub_selector:query(self.show_info, item.anilist_data)
             end
         }
-        self.items[#self.items].anilist_data = s
+        self.choices[#self.choices].anilist_data = s
     end
     self:open()
 end
 
 function sub_selector:init(backend)
     self.backend = backend
-    self.offset = 3 -- to compensate for the non-sub header menu entry and back option
-    self.showing_all_items = false -- this is toggled when the user toggles the show all files button
+    self.showing_all_choices = false -- this is toggled when the user toggles the show all files button
     self.go_back_option = self.go_back_option or self:add_option {
         display_text = " >>>   Return to show selection",
         on_chosen_cb = function()
             self:close()
+            self.showing_all_choices = false
             show_selector:display()
         end
     }
     self.show_all_toggle = self.show_all_toggle or self:add_option {
         display_text = " >>>   Toggle showing all files",
         on_chosen_cb = function()
-            self.showing_all_items = not self.showing_all_items
+            self.showing_all_choices = not self.showing_all_choices
             self:display()
         end
     }
@@ -146,10 +146,6 @@ function sub_selector:init(backend)
             self:draw()
         end
     end
-    self:on_close(function()
-        self.showing_all_items = false
-
-    end)
 end
 
 function sub_selector:query(show_info, anilist_data)
@@ -195,7 +191,7 @@ function sub_selector:display()
         return
     end
 
-    self:clear_items()
+    self:clear_choices()
     local start_dl = false
 
     self.last_selected = nil -- store sid of active sub here
@@ -208,7 +204,7 @@ function sub_selector:display()
         local menu_entry = self:new_item {
             display_text = text,
             width = mp.get_property("osd-width") - 100,
-            is_visible = self.showing_all_items and true or sub.matching_episode,
+            is_visible = self.showing_all_choices and true or sub.matching_episode,
             font_size = 17,
             on_selected_cb = function(item) self:select_item(item) end,
             on_chosen_cb = function(item) self:choose_item(item) end
