@@ -73,6 +73,20 @@ function Scheduler:poll()
     return finished_results
 end
 
+function Scheduler:wait()
+    local all_finished = {}
+    while true do
+        for _,res in ipairs(self:poll()) do
+            table.insert(all_finished, res)
+        end
+        if not self:has_remaining() then
+            break
+        end
+        socket.select(self.sockets)
+    end
+    return all_finished
+end
+
 function Scheduler:quit()
     print("Closing all sockets")
     for _,sock in ipairs(self.sockets) do sock:close() end

@@ -81,15 +81,15 @@ function backend:query_subtitles(show_info)
     assert(false, "This should be implemented in a specific backend!")
 end
 
+
 --- Extract all subtitle files in the given archive and store them in predefined cache directory
 ---@param file string: filename which is a archive containing subtitles
 ---@param show_info table containing title, ep_number and anilist_data
----@return string path where the extracted subtitles are stored
+---@return string path,table files extracted cache path and table with the actual files
 function backend:extract_archive(file, show_info)
-    local ep_fmt = ("*%%0%dd*"):format(#tostring(show_info.anilist_data.episodes or "00"))
-    local cached_path = self:get_cached_path(show_info)
-    local ep = (show_info.ep_number and ep_fmt:format(show_info.ep_number) or "*") .. ".%s"
-    local extensions = Sequence { "srt", "ass", "ssa", "pgs", "sup", "sub", "idx" }:map(function(ext) return ep:format(ext) end):collect()
+    local tmp_path = os.tmpname()
+    os.remove(tmp_path)
+    os.execute(("mkdir -p %q"):format(tmp_path))
 
     local function extract_inner_archive(path_to_archive)
         print(string.format("Looking for archive files in: %q", path_to_archive))
@@ -98,36 +98,45 @@ function backend:extract_archive(file, show_info)
             print(string.format("Archive was invalid! skipping..\n"))
             return
         end
-        local archive_filter = { "*.zip", "*.rar" }
+        local archive_filter = { "*.zip", "*.rar", "*.7z" }
         for arch in parser:list_files { filter = archive_filter } do
-            parser:extract { filter = { arch }, target_path = cached_path }
+            print(arch)
+            parser:extract { filter = { arch }, target_path = tmp_path }
             -- lookup in archive can have full path, so strip it
-            local a_path = string.format("%s/%s", cached_path, util.strip_path(arch))
+            local a_path = string.format("%s/%s", tmp_path, util.strip_path(arch))
             extract_inner_archive(a_path)
         end
     end
-    -- extract all zips to the cache folder, then loop over each zip and look for matching subtitle files within
-    os.execute(string.format("mkdir -p %q", cached_path))
     extract_inner_archive(file)
 
-    --TODO copying should only be done in the offline flow
-    --os.execute(string.format("cp %q %q", file, cached_path))
-    print(string.format("Extracting matches to: %q", cached_path))
-    Sequence(util.run_cmd(string.format("ls %q/*.{rar,zip}", cached_path)))
+    os.execute(string.format("cp %q %q", file, tmp_path))
+    print(string.format("Extracting matches to: %q", tmp_path))
+    Sequence(util.run_cmd(string.format("ls %q/*.{rar,zip,7z}", tmp_path)))
         :foreach(function(full_path)
             local parser = archive:new(full_path)
             if not parser:check_valid() then
                 os.remove(full_path)
                 return
             end
-            for arch in parser:list_files { filter = extensions } do
-                if self:is_matching_episode(show_info, arch) then
-                    parser:extract { filter = { arch }, target_path = cached_path }
-                end
+            for arch in parser:list_files{} do
+                parser:extract { filter = { arch }, target_path = tmp_path }
             end
             os.remove(full_path)
         end)
-    return cached_path
+    local cached_path = self:get_cached_path(show_info)
+    local files = {}
+    for _,f in ipairs(util.run_cmd(("ls %q"):format(tmp_path))) do
+        table.insert(files, {
+            name = f,
+            absolute_path = cached_path .. '/' .. f,
+            matching_episode = self:is_matching_episode(show_info, f),
+            _initialized = true
+        })
+    end
+    os.execute(string.format("mkdir -p %q", cached_path))
+    os.execute(("cp %q/* %q"):format(tmp_path, cached_path))
+    os.execute(("rm -r %q"):format(tmp_path))
+    return cached_path, files
 end
 
 function backend:get_cached_path(show_info)

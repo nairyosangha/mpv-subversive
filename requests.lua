@@ -95,7 +95,7 @@ function async:GET(client_socket)
         local result, status, partial = client_socket:receive(pattern)
         if status then
             if partial and #partial > 0 then
-                print(("Got partial (size %d), requested %s (current size: %d)"):format(#partial, pattern, partials[id] and #partials[id] or 0))
+                --print(("Got partial (size %d), requested %s (current size: %d)"):format(#partial, pattern, partials[id] and #partials[id] or 0))
                 partials[id] = (partials[id] or '') .. partial
             end
             return false, status

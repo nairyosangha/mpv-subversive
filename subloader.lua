@@ -5,7 +5,7 @@ local mp = require 'mp'
 local mpu = require 'mp.utils'
 local mpi = require 'mp.input'
 local menu = require 'menu'
-local util = require 'utils/utils'
+local util = require 'utils.utils'
 
 local function build_menu_entry(anilist_media)
     local start, end_ = anilist_media.startDate.year, anilist_media.endDate.year
@@ -154,7 +154,33 @@ function sub_selector:query(show_info, anilist_data)
         -- bit of a hack to not display subs for a different show if we manually changed the episode name
         show_info.parsed_title = anilist_data.title and anilist_data.title.romaji or show_info.parsed_title
     end
-    self.subtitles = self.backend:query_subtitles(show_info)
+    self.subtitles = {}
+    local archive_cnt, completed_archive_cnt = 0, 0
+    for _,sub in ipairs(self.backend:query_subtitles(show_info)) do
+        if sub.is_archive then
+            archive_cnt = archive_cnt + 1
+            self.backend:download_subtitle(sub):on_complete(function(result)
+                completed_archive_cnt = completed_archive_cnt + 1
+                mp.osd_message(("Finished archive %d of %d: %s"):format(completed_archive_cnt, archive_cnt, sub.name))
+                local tmp_name = self.backend.cache_directory .. '/' .. sub.name
+                local tmp = assert(io.open(tmp_name, 'wb'))
+                tmp:write(result.data)
+                tmp:close()
+                local _,files_in_archive = self.backend:extract_archive(tmp_name, show_info)
+                for _,f in ipairs(files_in_archive) do
+                    table.insert(self.subtitles, f)
+                end
+                os.remove(tmp_name)
+                return true
+            end)
+        else
+            table.insert(self.subtitles, sub)
+        end
+    end
+    if archive_cnt > 0 then
+        mp.osd_message(("Extracting %d archive files, this may take a while.."):format(archive_cnt))
+        self.backend:get_scheduler():wait()
+    end
     table.sort(self.subtitles, function(a,b) return a.name < b.name end)
     self:display()
 end
@@ -200,9 +226,6 @@ function sub_selector:display()
     local visible_subs_count = 0
     for _, sub in ipairs(self.subtitles) do
         local text = sub.name
-        if self.backend:is_supported_archive(sub.absolute_path) then
-            text = "<ENTER to download archive> " .. text
-        end
         local menu_entry = self:new_item {
             display_text = text,
             is_visible = self.showing_all_choices and true or sub.matching_episode,

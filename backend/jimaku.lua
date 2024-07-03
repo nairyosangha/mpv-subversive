@@ -31,16 +31,14 @@ function jimaku:query_subtitles(show_info)
     }
     local entries, err = mpu.parse_json(response)
     assert(entries, err)
-    local file_filter = function(file_entry)
-        return file_entry.is_archive or self:is_matching_episode(show_info, file_entry.name)
-    end
     local cached_path = self:get_cached_path(show_info)
     os.execute(string.format("mkdir -p %q", cached_path))
 
     local items = {}
     for _, entry in ipairs(entries) do
         for _, file in ipairs(self:get_files(entry.id)) do
-            file.matching_episode = file_filter(file)
+            file.is_archive = self:is_supported_archive(file.name)
+            file.matching_episode = self:is_matching_episode(show_info, file.name)
             file.absolute_path = cached_path .. '/' .. file.name
             table.insert(items, file)
         end
