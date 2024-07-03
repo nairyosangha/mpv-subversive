@@ -1,12 +1,12 @@
 require 'utils.sequence'
 require 'utils.regex'
 local mpu = require 'mp.utils'
-local util = require 'utils/utils'
-local archive = require 'archive'
+local util = require 'utils.utils'
+local archive = require 'utils.archive'
 local requests = require 'requests'
 
 local backend = {
-    archive_extensions = { ["RAR"] = 1, ["ZIP"] = 1 },
+    archive_extensions = { ["RAR"] = 1, ["ZIP"] = 1, ["7Z"] = 1 },
 }
 
 function backend:new(options)

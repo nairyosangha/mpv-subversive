@@ -13,12 +13,13 @@ The code to display the GUI menu is largely borrowed from [autosubsync-mpv](http
 ## Dependencies
 - unrar
 - unzip
+- 7zip
 - lua5.1
 - luarocks (to install luasocket and luasec)
 
 ## Installation
 ```sh
-sudo pacman -Syu unrar unzip lua51 luarocks
+sudo pacman -Syu unrar unzip p7zip lua51 luarocks
 sudo luarocks --lua-version 5.1 install luasocket
 sudo luarocks --lua-version 5.1 install luasec
 git clone --recurse-submodules https://github.com/nairyosangha/mpv-subversive.git ~/.config/mpv/scripts/mpv-subversive
