@@ -40,6 +40,9 @@ function jimaku:query_subtitles(show_info)
             file.is_archive = self:is_supported_archive(file.name)
             file.matching_episode = self:is_matching_episode(show_info, file.name)
             file.absolute_path = cached_path .. '/' .. file.name
+            local _,_, year, month, day, hour, minute, second = string.find(file.last_modified, "(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+).?%d*Z")
+            assert(year, ("Could not parse last_modified time '%s'"):format(file.last_modified))
+            file.last_modified = os.time({ year=year, month=month, day=day, hour=hour, minute=minute, second=second })
             table.insert(items, file)
         end
     end

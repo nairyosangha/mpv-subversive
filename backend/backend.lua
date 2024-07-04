@@ -30,9 +30,6 @@ function backend:is_matching_episode(show_info, filename)
     local sanitized_filename = self.sanitize(filename)
     local zero_padded_ep_number = ("%%0%dd"):format(#tostring(show_info.anilist_data.episodes or "00")):format(show_info.ep_number)
     local match = sanitized_filename:match(zero_padded_ep_number)
-    if not match then
-        print(("Discarding file which didn't match ep_number %s (sanitized fn '%s')"):format(show_info.ep_number, sanitized_filename))
-    end
     return match ~= nil
 end
 
@@ -100,7 +97,6 @@ function backend:extract_archive(file, show_info)
         end
         local archive_filter = { "*.zip", "*.rar", "*.7z" }
         for arch in parser:list_files { filter = archive_filter } do
-            print(arch)
             parser:extract { filter = { arch }, target_path = tmp_path }
             -- lookup in archive can have full path, so strip it
             local a_path = string.format("%s/%s", tmp_path, util.strip_path(arch))
@@ -111,16 +107,14 @@ function backend:extract_archive(file, show_info)
 
     os.execute(string.format("cp %q %q", file, tmp_path))
     print(string.format("Extracting matches to: %q", tmp_path))
-    Sequence(util.run_cmd(string.format("ls %q/*.{rar,zip,7z}", tmp_path)))
+    Sequence(util.run_cmd(string.format("ls %q/*.{rar,zip,7z} 2>/dev/null", tmp_path)))
         :foreach(function(full_path)
             local parser = archive:new(full_path)
             if not parser:check_valid() then
                 os.remove(full_path)
                 return
             end
-            for arch in parser:list_files{} do
-                parser:extract { filter = { arch }, target_path = tmp_path }
-            end
+            parser:extract { target_path = tmp_path }
             os.remove(full_path)
         end)
     local cached_path = self:get_cached_path(show_info)
@@ -140,10 +134,7 @@ function backend:extract_archive(file, show_info)
 end
 
 function backend:get_cached_path(show_info)
-    if show_info.ep_number then
-        return string.format("%s/%s/%s", self.cache_directory, show_info.parsed_title, show_info.ep_number)
-    end
-    return string.format("%s/%s", self.cache_directory, show_info.parsed_title)
+    return ("%s/%s/"):format(self.cache_directory, show_info.anilist_data.id)
 end
 
 function backend.sanitize(text)

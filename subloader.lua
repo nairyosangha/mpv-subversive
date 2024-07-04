@@ -155,24 +155,34 @@ function sub_selector:query(show_info, anilist_data)
         show_info.parsed_title = anilist_data.title and anilist_data.title.romaji or show_info.parsed_title
     end
     self.subtitles = {}
+    self.show_info = show_info
+    local function extract_archive(path_to_archive)
+        local _,files_in_archive = self.backend:extract_archive(path_to_archive, show_info)
+        for _,f in ipairs(files_in_archive) do
+            table.insert(self.subtitles, f)
+        end
+        return files_in_archive
+    end
     local archive_cnt, completed_archive_cnt = 0, 0
     for _,sub in ipairs(self.backend:query_subtitles(show_info)) do
+        if self:is_cached(sub) then sub._initialized = true end
         if sub.is_archive then
-            archive_cnt = archive_cnt + 1
-            self.backend:download_subtitle(sub):on_complete(function(result)
-                completed_archive_cnt = completed_archive_cnt + 1
-                mp.osd_message(("Finished archive %d of %d: %s"):format(completed_archive_cnt, archive_cnt, sub.name))
-                local tmp_name = self.backend.cache_directory .. '/' .. sub.name
-                local tmp = assert(io.open(tmp_name, 'wb'))
-                tmp:write(result.data)
-                tmp:close()
-                local _,files_in_archive = self.backend:extract_archive(tmp_name, show_info)
-                for _,f in ipairs(files_in_archive) do
-                    table.insert(self.subtitles, f)
+            local archive_name = self.backend:get_cached_path(show_info) .. sub.name
+            if sub._initialized then
+                for _,s in ipairs(self:get_cache().archives[sub.name]) do
+                    s.matching_episode = self.backend:is_matching_episode(show_info, sub.name)
+                    table.insert(self.subtitles, s)
                 end
-                os.remove(tmp_name)
-                return true
-            end)
+            else
+                archive_cnt = archive_cnt + 1
+                self.backend:download_subtitle(sub):on_complete(function(result)
+                    completed_archive_cnt = completed_archive_cnt + 1
+                    mp.osd_message(("Finished archive %d of %d: %s"):format(completed_archive_cnt, archive_cnt, sub.name))
+                    util.open_file(archive_name, 'wb', function(f) f:write(result.data) end)
+                    self:cache_archive(sub, extract_archive(archive_name))
+                    return true
+                end)
+            end
         else
             table.insert(self.subtitles, sub)
         end
@@ -184,6 +194,44 @@ function sub_selector:query(show_info, anilist_data)
     table.sort(self.subtitles, function(a,b) return a.name < b.name end)
     self:display()
 end
+
+function sub_selector:get_cache()
+    if not self.backend.cache then
+        self.backend.cache = {}
+    end
+    local show_id = self.show_info.anilist_data.id
+    if not self.backend.cache[show_id] then
+        local cache_path = self.backend:get_cached_path(self.show_info) .. 'cache.json'
+        print(("Checking cache for id %s in path %q"):format(show_id, cache_path))
+        self.backend.cache[show_id] = util.open_file(cache_path, 'r', function(f)
+            local c, err = mpu.parse_json(f:read("*a"))
+            if not c then
+                print(("Could not parse stored JSON %q: %s"):format(cache_path, err))
+            end
+            return c
+        end) or { subs = {}, archives = {} }
+    end
+    return self.backend.cache[show_id]
+end
+
+function sub_selector:is_cached(sub)
+    local last_modified = self:get_cache().subs[sub.name]
+    return last_modified and last_modified >= sub.last_modified
+end
+
+function sub_selector:cache_subtitle(sub)
+    self:get_cache().subs[sub.name] = sub.last_modified
+end
+
+function sub_selector:cache_archive(archive, files_in_archive)
+    files_in_archive = util.copy_table(files_in_archive)
+    self:cache_subtitle(archive)
+    for _,f in ipairs(files_in_archive) do
+        f.matching_episode = nil
+    end
+    self:get_cache().archives[archive.name] = files_in_archive
+end
+
 
 function sub_selector:select_item(menu_item)
     if not menu_item.subtitle._initialized then
@@ -264,9 +312,8 @@ function sub_selector:download(menu_item)
         if response.status_code ~= 200 then
             return false
         end
-        local f = assert(io.open(sub.absolute_path, 'wb'))
-        f:write(response.data)
-        f:close()
+        util.open_file(sub.absolute_path, 'wb', function(f) f:write(response.data) end)
+        self:cache_subtitle(sub)
         menu_item.subtitle._initialized = true
         menu_item.display_text = sub.name
         return true

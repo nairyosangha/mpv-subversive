@@ -1,6 +1,8 @@
 local mp = require 'mp'
+local mpu = require 'mp.utils'
 local options = require 'mp.options'
 local loader = require('subloader')
+local util = require 'utils.utils'
 
 OPTS = {
     enabled = true,
@@ -27,6 +29,11 @@ if OPTS.enabled then
     mp.register_event("shutdown", function()
         if backend and backend.scheduler then
             backend.scheduler:quit()
+        end
+        for anilist_id, cache_table in pairs(backend.cache or {}) do
+            util.open_file(backend.cache_directory .. '/' .. anilist_id .. '/' .. 'cache.json', 'w', function(f)
+                f:write(mpu.format_json(cache_table))
+            end)
         end
     end)
 end
