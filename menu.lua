@@ -130,9 +130,8 @@ function Menu:add_item(item_opts)
 end
 
 function Menu:add_option(item_opts)
-    local opt = self:new_item(item_opts)
-    table.insert(self.options, opt)
-    return opt
+    table.insert(self.options, self:new_item(item_opts))
+    return self.options[#self.options]
 end
 
 function Menu:clear_choices(with_redraw)

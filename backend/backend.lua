@@ -114,18 +114,24 @@ function backend:extract_archive(file, show_info)
                 os.remove(full_path)
                 return
             end
-            parser:extract { target_path = tmp_path }
+            -- TODO what if we get multiple archives with filenames that overwrite each other?
+            for f in parser:list_files{} do
+                print(("Listing file from %s: %s"):format(full_path, f))
+                parser:extract { filter = { f }, target_path = tmp_path }
+            end
             os.remove(full_path)
         end)
     local cached_path = self:get_cached_path(show_info)
     local files = {}
     for _,f in ipairs(util.run_cmd(("ls %q"):format(tmp_path))) do
-        table.insert(files, {
-            name = f,
-            absolute_path = cached_path .. '/' .. f,
-            matching_episode = self:is_matching_episode(show_info, f),
-            _initialized = true
-        })
+        if util.path_exists(tmp_path .. '/' .. f) then
+            table.insert(files, {
+                name = f,
+                absolute_path = cached_path .. '/' .. f,
+                matching_episode = self:is_matching_episode(show_info, f),
+                _initialized = true
+            })
+        end
     end
     os.execute(string.format("mkdir -p %q", cached_path))
     os.execute(("cp %q/* %q"):format(tmp_path, cached_path))

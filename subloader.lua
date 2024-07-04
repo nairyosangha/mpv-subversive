@@ -54,7 +54,10 @@ function show_selector:build_manual_lookup_console()
             end
             mpi.terminate()
             local anilist_data = matching_shows[cur_idx]
-            sub_selector:query(self.show_info, anilist_data)
+            self.show_list = { anilist_data }
+            self.show_info.anilist_data = anilist_data
+            self.show_info.parsed_title = anilist_data.title and anilist_data.title.romaji or self.show_info.parsed_title
+            sub_selector:query(self.show_info)
         end,
         -- we are kinda abusing the complete function here, we never actually complete the text
         -- we just update the displayed log messages so the user can pick a show there
@@ -91,7 +94,6 @@ end
 function show_selector:init(backend, show_info)
     self.backend = backend
     self.show_info = show_info
-    self.options = {}
     self.modify_show_item = self.modify_show_item or self:add_option {
         display_text = " >>>   Text-based lookup",
         on_chosen_cb = function() self:build_manual_lookup_console() end
@@ -114,7 +116,8 @@ function show_selector:display(show_list)
         self:add_item {
             display_text = build_menu_entry(s),
             on_chosen_cb = function(item)
-                sub_selector:query(self.show_info, item.anilist_data)
+                self.show_info.anilist_data = item.anilist_data
+                sub_selector:query(self.show_info)
             end
         }
         self.choices[#self.choices].anilist_data = s
@@ -148,12 +151,7 @@ function sub_selector:init(backend)
     end
 end
 
-function sub_selector:query(show_info, anilist_data)
-    if anilist_data then
-        show_info.anilist_data = anilist_data
-        -- bit of a hack to not display subs for a different show if we manually changed the episode name
-        show_info.parsed_title = anilist_data.title and anilist_data.title.romaji or show_info.parsed_title
-    end
+function sub_selector:query(show_info)
     self.subtitles = {}
     self.show_info = show_info
     local function extract_archive(path_to_archive)
@@ -169,8 +167,8 @@ function sub_selector:query(show_info, anilist_data)
         if sub.is_archive then
             local archive_name = self.backend:get_cached_path(show_info) .. sub.name
             if sub._initialized then
-                for _,s in ipairs(self:get_cache().archives[sub.name]) do
-                    s.matching_episode = self.backend:is_matching_episode(show_info, sub.name)
+                for _,s in ipairs(util.copy_table(self:get_cache().archives[sub.name])) do
+                    s.matching_episode = self.backend:is_matching_episode(show_info, s.name)
                     table.insert(self.subtitles, s)
                 end
             else
@@ -342,7 +340,8 @@ function loader:run(backend)
     -- look for .anilist.id file to skip the jimaku lookup
     local saved_id = util.open_file("./.anilist.id", 'r', function(f) return f:read("*l") end)
     if saved_id then
-        return sub_selector:query(initial_show_info, { id = saved_id })
+        initial_show_info.anilist_data = { id = saved_id }
+        return sub_selector:query(initial_show_info)
     end
 
     show_selector:display()

@@ -82,7 +82,7 @@ function Scheduler:wait()
         if not self:has_remaining() then
             break
         end
-        socket.select(self.sockets)
+        socket.select(self.sockets, {}, 1)
     end
     return all_finished
 end
