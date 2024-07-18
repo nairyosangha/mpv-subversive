@@ -22,6 +22,8 @@ end
 function jimaku:query_subtitles(show_info)
     local anilist_id = show_info.anilist_data.id
     mp.osd_message(("Finding matching subtitles for AniList ID '%s'"):format(anilist_id), 3)
+    -- we don't need this here, but this takes a sec to load, and it feels better to do it here
+    self:get_scheduler()
     local response = requests:GET {
         url = requests:build_url(self.BASE_URL, "entries/search", { anilist_id = anilist_id }),
         headers = {

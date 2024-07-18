@@ -17,7 +17,7 @@ function Scheduler.new(host, port, thread_count, default_headers)
     end
     sched.default_headers = {}
     for k,v in pairs(default_headers) do sched.default_headers[k] = v end
-    return setmetatable(sched, { __index = function(t, k) return rawget(t, k) or Scheduler[k] end })
+    return setmetatable(sched, { __index = Scheduler })
 end
 
 function Scheduler:schedule(opts)

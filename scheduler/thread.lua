@@ -1,6 +1,3 @@
-local socket = require("socket")
-local requests = require("requests")
-
 local Thread = {}
 local STATUS = { BUSY = 1, IDLE = 2 }
 for k,v in pairs(STATUS) do STATUS[v] = k end

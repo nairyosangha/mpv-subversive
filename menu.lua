@@ -30,7 +30,7 @@ function MenuItem:new(opts)
     new.height = opts.height or self.DEFAULT_HEIGHT
     new.is_selected = false
     return setmetatable(new, {
-        __index = function(t, k) return rawget(t, k) or self[k] end,
+        __index = self,
         __tostring = function(x)
             local string_rep = {}
             for k,v in pairs(x) do
