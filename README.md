@@ -2,7 +2,7 @@
 
 MPV (v0.38.0+) plugin **for GNU/Linux** that makes it easy to find and load subtitles for the shows you're watching.
 
-https://github.com/nairyosangha/mpv-subversive/assets/34285115/dc5cf7ab-9d19-4dce-952d-af80fe563ca2
+[demo.webm](https://github.com/user-attachments/assets/00b0fa29-70e3-4cf9-8637-c21c13af37fb)
 
 
 
