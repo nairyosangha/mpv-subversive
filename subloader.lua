@@ -185,12 +185,21 @@ function sub_selector:query(show_info)
             table.insert(self.subtitles, sub)
         end
     end
-    if archive_cnt > 0 then
-        mp.osd_message(("Extracting %d archive files, this may take a while.."):format(archive_cnt))
-        self.backend:get_scheduler():wait()
+    local function display_sorted_subs()
+        table.sort(self.subtitles, function(a,b) return a.name < b.name end)
+        self:display()
     end
-    table.sort(self.subtitles, function(a,b) return a.name < b.name end)
-    self:display()
+    if archive_cnt == 0 then
+        return display_sorted_subs()
+    end
+    mp.osd_message(("Extracting %d archive files, this may take a while.."):format(archive_cnt))
+    self.archive_timer = mp.add_periodic_timer(0.2, function()
+        self.backend:get_scheduler():poll()
+        if not self.backend:get_scheduler():has_remaining() then
+            self.archive_timer:kill()
+            display_sorted_subs()
+        end
+    end)
 end
 
 function sub_selector:get_cache()

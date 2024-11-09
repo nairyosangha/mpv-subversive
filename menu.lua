@@ -165,7 +165,7 @@ function Menu:get_visible_items()
     end
 
     local function is_within_window(item_idx)
-        print(("selected idx: %d, visible_selected_idx: %d, visible_item_count: %d"):format(item_idx + #self.options, visible_selected_idx, self.visible_item_count))
+        --print(("selected idx: %d, visible_selected_idx: %d, visible_item_count: %d"):format(item_idx + #self.options, visible_selected_idx, self.visible_item_count))
         return math.abs(item_idx - visible_selected_idx - 1) <= self.visible_item_count
     end
 

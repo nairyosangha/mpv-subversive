@@ -3,7 +3,7 @@ require 'utils.regex'
 local mpu = require 'mp.utils'
 local util = require 'utils.utils'
 local archive = require 'utils.archive'
-local requests = require 'requests'
+local HTTPClient = require 'http.client'
 
 local backend = {
     archive_extensions = { ["RAR"] = 1, ["ZIP"] = 1, ["7Z"] = 1 },
@@ -61,14 +61,14 @@ function backend:query_shows(show_info)
             search = show_info.parsed_title
         }
     })
-    local response = requests:POST {
+    local response = HTTPClient:POST {
         url = "https://graphql.anilist.co",
         headers = {
             ["Content-Type"] = "application/json"
         },
         body = body_json
     }
-    return mpu.parse_json(response).data.Page.media
+    return assert(mpu.parse_json(response.data), ("Could not parse anilist response: %s"):format(response.data)).data.Page.media
 end
 
 ---Extract all subtitles which are available for the given ID

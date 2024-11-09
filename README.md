@@ -11,11 +11,11 @@ This plugin depends on functionality provided by the [AniList API](https://anili
 The code to display the GUI menu is largely borrowed from [autosubsync-mpv](https://github.com/joaquintorres/autosubsync-mpv)
 
 ## Dependencies
-- unrar
-- unzip
-- 7zip
-- lua5.1
-- luarocks (to install luasocket and luasec)
+- unrar, unzip, 7zip (to extract archives)
+- luasocket, luasec (optional, script will fall back on CURL if this isn't present)
+- luarocks (optional, to install luasocket and luasec)
+
+Using luasocket/luasec is a bit faster since we can reuse TCP sockets in that case, but CURL should be perfectly usable too.
 
 ## Installation
 ```sh

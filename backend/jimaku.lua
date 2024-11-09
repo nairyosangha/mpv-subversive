@@ -1,19 +1,14 @@
 require 'utils.sequence'
-local requests = require 'requests'
+local HTTPClient = require("http.client")
 local mp = require 'mp'
 local mpu = require 'mp.utils'
-local scheduler = require 'scheduler.scheduler'
 
 local jimaku = {
     BASE_URL = "https://jimaku.cc/api/",
-    thread_count = 3,
 }
 
 function jimaku:get_scheduler()
-    if not self.scheduler then
-        self.scheduler = scheduler.new("jimaku.cc", 443, self.thread_count, { ["Authorization"] = self.API_TOKEN })
-    end
-    return self.scheduler
+    return HTTPClient:get_scheduler("jimaku.cc", 443)
 end
 
 ---Extract all subtitles which are available for the given ID
@@ -24,14 +19,12 @@ function jimaku:query_subtitles(show_info)
     mp.osd_message(("Finding matching subtitles for AniList ID '%s'"):format(anilist_id), 3)
     -- we don't need this here, but this takes a sec to load, and it feels better to do it here
     self:get_scheduler()
-    local response = requests:GET {
-        url = requests:build_url(self.BASE_URL, "entries/search", { anilist_id = anilist_id }),
-        headers = {
-            ["Content-Type"] = "application/json",
-            ["Authorization"] = self.API_TOKEN
-        }
+    local response = HTTPClient:sync_GET {
+        url = self.BASE_URL .. "entries/search",
+        params = { anilist_id = anilist_id },
+        headers = { ["Authorization"] = self.API_TOKEN }
     }
-    local entries, err = mpu.parse_json(response)
+    local entries, err = mpu.parse_json(response.data)
     assert(entries, err)
     local cached_path = self:get_cached_path(show_info)
     os.execute(string.format("mkdir -p %q", cached_path))
@@ -52,25 +45,20 @@ function jimaku:query_subtitles(show_info)
 end
 
 function jimaku:get_files(entry_id)
-    local response = requests:GET {
-        url = requests:build_url(self.BASE_URL, ("entries/%s/files"):format(entry_id)),
-        headers = {
-            ["Content-Type"] = "application/json",
-            ["Authorization"] = self.API_TOKEN
-        }
+    local response = HTTPClient:sync_GET {
+        url = self.BASE_URL ..  ("entries/%s/files"):format(entry_id),
+        headers = { ["Authorization"] = self.API_TOKEN }
     }
-    local result, err = mpu.parse_json(response)
+    local result, err = mpu.parse_json(response.data)
     return assert(result, err)
 end
 
+---@return Routine
 function jimaku:download_subtitle(file_entry)
-    local host, path, _ = requests:unpack_url(file_entry.url)
-    local headers = {
-        ["Host"] = host,
-        ["Accept"] = "application/octet-stream",
-        ["Connection"] = "keep-alive",
+    return HTTPClient:async_GET {
+        url = file_entry.url,
+        headers = { ["Accept"] = "application/octet-stream" }
     }
-    return self:get_scheduler():schedule { path = path,  headers = headers }
 end
 
 return jimaku
