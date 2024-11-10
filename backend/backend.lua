@@ -11,6 +11,13 @@ local backend = {
 
 function backend:new(options)
     local backend_impl = require("backend." .. string.lower(options.subtitle_backend))
+    options.media_blacklist = {}
+    if options.enable_lookup_caching and #options.media_blacklist_dir > 0 then
+        for dir in options.media_blacklist_dir:gmatch("([^;]+)") do
+            options.media_blacklist[#options.media_blacklist+1] = dir
+        end
+        print("Skipping lookup caching for the following directories: ", table.concat(options.media_blacklist, ", "))
+    end
     return setmetatable(options, {
         __index = function(t, k)
             return backend_impl[k] or self[k] or rawget(t, k)

@@ -10,6 +10,13 @@ OPTS = {
     -- If the path is relative, this is interpreted as relative to the currently playing file
     chosen_sub_dir = './subs',
     cache_directory = "/tmp/subloader",
+    -- When looking up the show for any given file, the result of that lookup is stored in the cache
+    -- That same result is then used for all other files in the directory of that file.
+    enable_lookup_caching = true,
+    -- Exclude some directories from being considered for lookup caching.
+    -- This can be useful if you have a directory which contains many unrelated files.
+    -- you can add multiple directories, separated by semicolons (;)
+    media_blacklist_dir = "",
     subtitle_backend = 'jimaku', -- can be either 'jimaku' or 'offline'
     -- the following options are used when using the 'offline' backend
     subtitle_mapping = string.format("%s/mapping.csv", mp.get_script_directory()),

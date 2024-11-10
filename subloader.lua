@@ -1,4 +1,6 @@
-local loader = {}
+local loader = {
+    ID_FILE = ".anilist.id"
+}
 require 'utils.sequence'
 require 'utils.regex'
 local mp = require 'mp'
@@ -57,6 +59,7 @@ function show_selector:build_manual_lookup_console()
             self.show_list = { anilist_data }
             self.show_info.anilist_data = anilist_data
             self.show_info.parsed_title = anilist_data.title and anilist_data.title.romaji or self.show_info.parsed_title
+            self:cache_lookup(anilist_data)
             sub_selector:query(self.show_info)
         end,
         -- we are kinda abusing the complete function here, we never actually complete the text
@@ -105,6 +108,25 @@ function show_selector:init(backend, show_info)
     self.initialized = true
 end
 
+function show_selector:cache_lookup(anilist_data)
+    if not self.backend.enable_lookup_caching then
+        return
+    end
+    local dir, _ = mpu.split_path(mp.get_property("path"))
+    local normalized_dir = mp.command_native({"normalize-path", dir })
+    for _,media_blacklist_dir in pairs(self.backend.media_blacklist) do
+        if normalized_dir == media_blacklist_dir then
+            return
+        end
+    end
+
+    local file_path = ("%s/%s"):format(normalized_dir, loader.ID_FILE)
+    util.open_file(file_path, "w", function(f)
+        print(("Caching show '%s', storing %s in %s"):format(anilist_data.title.romaji, anilist_data.id, file_path))
+        f:write(anilist_data.id)
+    end)
+end
+
 function show_selector:display(show_list)
     -- only show at most 10 entries, if there are more we probably parsed the show name wrong, plus the list wouldn't render right anyway
     self.show_list = show_list and show_list or util.table_slice(self.backend:query_shows(self.show_info), 1, 11)
@@ -117,6 +139,7 @@ function show_selector:display(show_list)
             display_text = build_menu_entry(s),
             on_chosen_cb = function(item)
                 self.show_info.anilist_data = item.anilist_data
+                self:cache_lookup(item.anilist_data)
                 sub_selector:query(self.show_info)
             end
         }
@@ -334,20 +357,20 @@ function sub_selector:download(menu_item)
 end
 
 function loader:run(backend)
-    mp.osd_message("Parsing file name..")
-    local show_name, episode = backend:parse_current_file(mp.get_property("filename"))
+    mp.osd_message("Running mpv-subversive", 1)
+    local dir, fn = mpu.split_path(mp.get_property("path"))
+    local normalized_dir = mp.command_native({"normalize-path", dir })
+    local show_name, episode = backend:parse_current_file(fn)
     local initial_show_info = {
         parsed_title = show_name,
         ep_number = episode and tonumber(episode),
-        -- the following field gets filled in later after we query AniList
-        anilist_data = nil
     }
     print(("show title: '%s', episode number: '%d'"):format(show_name, episode or -1))
     show_selector:init(backend, initial_show_info)
     sub_selector:init(backend)
 
     -- look for .anilist.id file to skip the jimaku lookup
-    local saved_id = util.open_file("./.anilist.id", 'r', function(f) return f:read("*l") end)
+    local saved_id = util.open_file(normalized_dir..'/'..self.ID_FILE, 'r', function(f) return f:read("*l") end)
     if saved_id then
         initial_show_info.anilist_data = { id = saved_id }
         return sub_selector:query(initial_show_info)
