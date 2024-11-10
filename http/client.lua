@@ -53,6 +53,13 @@ function HTTPClient:parse_response(response)
     local state = 1 -- 1:header, 2:data
     local chunk_size, chunk_data = nil, "" -- only used when we're dealing with chunks
     local response_headers, data = {}, nil
+    local function print_headers()
+        local header_str = {}
+        for k,v in pairs(response_headers) do
+            header_str[#header_str+1] = ("%s=\"%s\""):format(k, v)
+        end
+        return table.concat(header_str, "\n\t - ")
+    end
     local _, e, status_code, status_reason = response:find("^HTTP/[.1-3]+ (%d+)%s?([%s%w]*)\r?\n")
     assert(type(e) == "number", ("Could not parse HTTP header from response: \"%s\""):format(({response:find("^(.+)\r?\n")})[3] or response))
     local init_idx = e + 1
@@ -63,7 +70,7 @@ function HTTPClient:parse_response(response)
             state = 2
         elseif state == 1 then
             local _, _, key, value = line:find("^([^:]+): (.+)$")
-            response_headers[key] = string.lower(value)
+            response_headers[key:lower()] = value
         elseif state == 2 then
             -- done parsing headers, next up is data
             if response_headers["content-length"] then
@@ -71,7 +78,6 @@ function HTTPClient:parse_response(response)
                 assert(#data == tonumber(response_headers["content-length"]), "Read content NOT equal to Content-Length!")
             elseif response_headers["transfer-encoding"] == "chunked" then
                 if chunk_size then
-                    print(chunk_size, line, #line)
                     assert(chunk_size == #line, "Invalid chunk size!")
                     chunk_data = chunk_data .. line
                     chunk_size = nil
@@ -81,6 +87,8 @@ function HTTPClient:parse_response(response)
                         data = chunk_data
                     end
                 end
+            else
+                error(("Unable to parse response. headers: \n\t - [ %s ],\n remaining response data:\n \"%s\""):format(print_headers(), response:sub(init_idx, #response)))
             end
         end
         init_idx = end_idx and end_idx +1 or #response

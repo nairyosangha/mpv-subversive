@@ -149,7 +149,7 @@ function SOCKET:async_GET(request)
                     parser = response_parser
                 else
                     local _, _, key, value = header:find("^([^:]+): (.+)$")
-                    response['headers'][key] = value
+                    response['headers'][key:lower()] = value
                 end
                 return true
             end
