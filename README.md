@@ -82,10 +82,13 @@ A script to create this mapping is provided: `build_offline_mapping.lua`. To run
 
 - https://github.com/rxi/json.lua -> download the json.lua file and save it in this directory
 
+- fill in your API key here: https://github.com/nairyosangha/mpv-subversive/blob/ad2fb7233ac3f6604b2c2b0214b7072de6cb1844/build_offline_archive.lua#L7
 - https://github.com/luaposix/luaposix (optional) -> can also be installed with luarocks, see instructions above
 
-Alternatively you can uncomment the line that saves the mapping every 10 entries.
+If you don't want to install luaposix, you should uncomment the line that saves the mapping every so often. If you don't, it will only attempt to save the mapping at the very end, so if something goes wrong during the initial load you'll have to try all over again.
 
-https://github.com/nairyosangha/mpv-subversive/blob/master/build_offline_archive.lua#L75-76
+https://github.com/nairyosangha/mpv-subversive/blob/ad2fb7233ac3f6604b2c2b0214b7072de6cb1844/build_offline_archive.lua#L75-L76
 
-The script will run fine without luaposix, but it will only save the mapping at the very end, so if anything goes wrong you lose the mapping.
+To run the script, you can simply do `luajit ./build_offline_mapping.lua`
+
+Luajit is a dependency of MPV so it should be preinstalled. It will probably work with Lua 5.1 as well.
