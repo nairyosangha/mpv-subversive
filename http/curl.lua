@@ -61,7 +61,7 @@ function CURL:sync_GET(request)
     })
     assert(result, ("Could not complete curl command! %s"):format(error))
     local response = self:parse_response(result.stdout)
-    return self:validate(response, "GET")
+    return response
 end
 
 ---@param request Request
@@ -76,13 +76,13 @@ function CURL:async_GET(request)
             args = CURL:build_curl_cmd(request, "GET")
         }, function(success, result, error)
             assert(success, ("Could not complete curl command! %s"):format(error))
-            routine.callback_result = self:validate(self:parse_response(result.stdout), "GET")
+            routine.callback_result = self:parse_response(result.stdout)
             coroutine.resume(routine.co) -- this should end the coroutine
         end)
         coroutine.yield()
     end
     local routine = Routine:new {
-        id = assert(request.path, "Missing required 'path'"),
+        id = assert(request.id or request.path),
         polling_type = 'callback',
         create_coroutine_func = init_func,
     }
@@ -100,7 +100,7 @@ function CURL:POST(request)
         args = CURL:build_curl_cmd(request, "POST")
     })
     assert(result, ("Could not complete curl command! %s"):format(error))
-    return self:validate(self:parse_response(result.stdout), "POST")
+    return self:parse_response(result.stdout)
 end
 
 return CURL

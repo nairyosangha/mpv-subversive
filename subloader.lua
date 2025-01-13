@@ -186,10 +186,10 @@ function sub_selector:query(show_info)
     end
     local archive_cnt, completed_archive_cnt = 0, 0
     for _,sub in ipairs(self.backend:query_subtitles(show_info)) do
-        if self:is_cached(sub) then sub._initialized = true end
+        if self:is_cached(sub) then sub.is_downloaded = true end
         if sub.is_archive then
             local archive_name = self.backend:get_cached_path(show_info) .. sub.name
-            if sub._initialized then
+            if sub.is_downloaded then
                 for _,s in ipairs(util.copy_table(self:get_cache().archives[sub.name])) do
                     s.matching_episode = self.backend:is_matching_episode(show_info, s.name)
                     table.insert(self.subtitles, s)
@@ -264,7 +264,7 @@ end
 
 
 function sub_selector:select_item(menu_item)
-    if not menu_item.subtitle._initialized then
+    if not menu_item.subtitle.is_downloaded then
         return
     end
     if menu_item.parent.last_selected then
@@ -275,7 +275,7 @@ function sub_selector:select_item(menu_item)
 end
 
 function sub_selector:choose_item(menu_item)
-    if not menu_item.subtitle._initialized then
+    if not menu_item.subtitle.is_downloaded then
         return
     end
     mp.osd_message(string.format("chose: %s", menu_item.subtitle.name), 2)
@@ -314,7 +314,7 @@ function sub_selector:display()
         menu_entry.subtitle = sub
         if menu_entry.is_visible then
             visible_subs_count = visible_subs_count + 1
-            if not sub._initialized then
+            if not sub.is_downloaded then
                 start_dl = true
                 menu_entry.display_text = '[not downloaded]:  ' .. text
                 self:download(menu_entry)
@@ -333,7 +333,7 @@ function sub_selector:display()
 end
 
 function sub_selector:download(menu_item)
-    if menu_item.subtitle._initialized then
+    if menu_item.subtitle.is_downloaded then
         menu_item.display_text = menu_item.subtitle.name
         return
     end
@@ -344,7 +344,7 @@ function sub_selector:download(menu_item)
         end
         util.open_file(sub.absolute_path, 'wb', function(f) f:write(response.data) end)
         self:cache_subtitle(sub)
-        menu_item.subtitle._initialized = true
+        menu_item.subtitle.is_downloaded = true
         menu_item.display_text = sub.name
         return true
     end):on_incomplete(function(response)
@@ -372,7 +372,7 @@ function loader:run(backend)
     -- look for .anilist.id file to skip the jimaku lookup
     local saved_id = util.open_file(normalized_dir..'/'..self.ID_FILE, 'r', function(f) return f:read("*l") end)
     if saved_id then
-        initial_show_info.anilist_data = { id = saved_id }
+        initial_show_info.anilist_data = { id = tonumber(saved_id) }
         return sub_selector:query(initial_show_info)
     end
 

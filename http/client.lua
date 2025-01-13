@@ -7,6 +7,7 @@ local utils = require "utils.utils"
 ---@field status_message string? message corresponding with status_code, e.g. OK, ...
 
 ---@class Request
+---@field id? string represents this ID, can be used to refer back to it
 ---@field url string URL to query, WITHOUT query parameters
 ---@field host string? optional if URL is present
 ---@field path string? optional if URL is present
@@ -66,7 +67,7 @@ function HTTPClient:parse_response(response)
     while not data do
         local start_idx, end_idx = response:find("(\r?\n)", init_idx)
         local line = response:sub(init_idx, start_idx and start_idx-1 or #response)
-        if #line == 0 then
+        if #line == 0 and state == 1 then
             state = 2
         elseif state == 1 then
             local _, _, key, value = line:find("^([^:]+): (.+)$")
@@ -118,7 +119,7 @@ end
 
 ---@param response Response
 ---@param method method
----@return Response response
+---@return Response?result_if_ok,string? err_msg
 function HTTPClient:validate(response, method)
     local function get_err()
         if type(response.status_code) == 'string' then -- luasocket failure case
@@ -126,22 +127,33 @@ function HTTPClient:validate(response, method)
         end
         return ("[HTTP %d ERROR]: %s => %s"):format(response.status_code, response.status_message, response.data)
     end
-    assert(response.status_code == 200, self.err_msg:format(method, get_err()))
-    return response
+    if response.status_code == 200 then
+        return response
+    end
+    return nil, self.err_msg:format(method, get_err())
 end
 
 ---@param request Request
 function HTTPClient:sync_save(request)
-    local result = self:sync_GET(request)
-    utils.open_file(assert(request.path_to_file, "Missing path to file!"), 'wb', function(f) f:write(result.data) end)
+    local result_if_ok, err_msg = self:validate(self:sync_GET(request), "GET")
+    if result_if_ok then
+        return assert(utils.open_file(assert(request.path_to_file, "Missing path to file!"), 'wb', function(f) f:write(result_if_ok.data); return true end), ("Could not open path to file: %q"):format(request.path_to_file))
+    end
+    return result_if_ok, err_msg
 end
 
 ---@param request Request
 ---@return Routine<nil>
 function HTTPClient:async_save(request)
-    return self:async_GET(request):on_complete(function(result)
-        utils.open_file(assert(request.path_to_file, "Missing path to file!"), 'wb', function(f) f:write(result.data) end)
-    end)
+    return self
+        :async_GET(request)
+        :on_complete(function(result)
+            local result_if_ok, err_msg = self:validate(result, "GET")
+            if not result_if_ok then
+                return false, err_msg
+            end
+            return assert(utils.open_file(assert(request.path_to_file, "Missing path to file!"), 'wb', function(f) f:write(result.data); return true end), ("Could not open path to file: %q"):format(request.path_to_file))
+        end)
 end
 
 return setmetatable(HTTPClient, { __index = function(t, k) return rawget(t, k) or carrier[k] end })

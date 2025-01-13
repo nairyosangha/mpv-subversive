@@ -57,7 +57,7 @@ function SOCKET:create_socket(host, port, timeout)
         client_socket = assert(ssl.wrap(client_socket, self.ssl_params), "Could not create SSL connection")
         client_socket:sni(host)
         local ok, msg = client_socket:dohandshake()
-        assert(ok, ("SSL handshake failed: %s"):format(msg))
+        assert(ok, ("SSL handshake failed: %s"):format(msg or "")) -- or "" is needed to make lua5.1 happy, luajit handles it fine as is
     end
     client_socket:settimeout(timeout)
 
@@ -94,10 +94,13 @@ function SOCKET:sync_GET(request)
     request = self:unpack_url(request)
     local client_socket = self:create_socket(request.host, request.port, nil)
     local http_get_body = self:build_request(request, "GET", self.sync_default_headers)
-    client_socket:send(http_get_body)
-    local response = self:parse_response(client_socket:receive("*a"))
+    local send_res, send_err = client_socket:send(http_get_body)
+    assert(send_res, ("Error while sending data to socket: %s"):format(send_err))
+    local recv_res, recv_err = client_socket:receive("*a")
+    assert(recv_res, ("Error while sending data to socket: %s"):format(recv_err))
+    local response = self:parse_response(recv_res)
     client_socket:close()
-    return self:validate(response, "GET")
+    return response
 end
 
 ---@param request Request
@@ -105,7 +108,8 @@ end
 function SOCKET:async_GET(request)
     request = self:unpack_url(request)
     local init_func = function(routine)
-        routine.thread.sock:send(self:build_request(request, "GET", self.async_default_headers))
+        local send_res, send_err = routine.thread.sock:send(self:build_request(request, "GET", self.async_default_headers))
+        assert(send_res, ("Error while sending data to socket: %s"):format(send_err))
         local parser, status_parser, header_parser, response_parser
         local partials = {}
 
@@ -173,10 +177,10 @@ function SOCKET:async_GET(request)
                 coroutine.yield(response)
             end
         end
-        return self:validate(response, "GET")
+        return response
     end
     local routine = Routine:new {
-        id = assert(request.path, "Missing required 'path'"),
+        id = assert(request.id or request.path),
         polling_type = 'checked',
         create_coroutine_func = init_func,
     }
@@ -194,7 +198,7 @@ function SOCKET:POST(request)
     assert(recv_res, ("Error while sending data to socket: %s"):format(recv_err))
     local response = self:parse_response(recv_res)
     client_socket:close()
-    return self:validate(response, "POST")
+    return response
 end
 
 return SOCKET

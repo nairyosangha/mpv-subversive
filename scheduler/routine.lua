@@ -20,7 +20,7 @@ function Routine:new(opts)
     r.polling_type = opts.polling_type
     r.create_coroutine_func = assert(opts.create_coroutine_func, "Missing init function for new Routine")
     -- takes in the result, returns boolean indicating if the result was valid or not
-    r.on_complete_cb = opts.on_complete_cb or function(result) return true end
+    r.on_complete_cb = opts.on_complete_cb or function() return true end
     -- takes in the result, which is still incomplete, this can be used to check the headers to get a % downloaded
     r.on_incomplete_cb = opts.on_incomplete_cb or function() end
     return setmetatable(r, { __index = self, __tostring = self.__tostring })
@@ -41,7 +41,7 @@ function Routine:run()
     local result = nil
     if self.polling_type == 'checked' then
         local ok, result_if_ok = coroutine.resume(self.co, self)
-        assert(ok, ("Error during running of coroutine: %s"):format(tostring(result) or ""))
+        assert(ok, ("Error during running of coroutine: %s"):format(tostring(result_if_ok) or ""))
         if coroutine.status(self.co) == "suspended" then
             return self.on_incomplete_cb(result_if_ok)
         end
@@ -57,7 +57,7 @@ function Routine:run()
 
     self:unassign()
     print(("Finished running routine %s"):format(self))
-    return self.on_complete_cb(result) and result
+    return result
 end
 
 function Routine:unassign()

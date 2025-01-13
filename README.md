@@ -64,8 +64,28 @@ This API key then needs to be added to the script's configuration, see above.
 To be able to use the plugin in offline mode, you need to have a locally stored archive of subtitles, and a mapping which links an AniList ID to a path to the directory (or zip/rar file) containing subtitles for the given ID.
 We look for this mapping file (with name `mapping.csv`) in the script's directory itself. This can be overwritten in the configuration.
 
-This mapping file should have the following format:
+This file should look like this, 2 columns are expected, the anilist ID and a relative path to the local mapping directory.
 ```
-<anilist_id>,/absolute/path/to/subtitle/directory
-...
+3269,"./mapping/.hack//G.U. Trilogy"
+11755,"./mapping/009 RE:CYBORG"
+5525,"./mapping/07-Ghost"
+116242,"./mapping/100-man no Inochi no Ue ni Ore wa Tatteiru"
+127366,"./mapping/100-man no Inochi no Ue ni Ore wa Tatteiru 2nd Season"
+6682,"./mapping/11eyes"
+159559,"./mapping/16bit Sensation: ANOTHER LAYER"
+133411,"./mapping/180-byou de Kimi no Mimi wo Shiawase ni Dekiru ka?"
+161680,"./mapping/1LDK+JK Ikinari Doukyo? Micchaku!? Hatsu Ecchi!!?"
+113231,"./mapping/2.43: Seiin Koukou Danshi Volley-bu"
 ```
+
+A script to create this mapping is provided: `build_offline_mapping.lua`. To run this script you'll need the following:
+
+- https://github.com/rxi/json.lua -> download the json.lua file and save it in this directory
+
+- https://github.com/luaposix/luaposix (optional) -> can also be installed with luarocks, see instructions above
+
+Alternatively you can uncomment the line that saves the mapping every 10 entries.
+
+https://github.com/nairyosangha/mpv-subversive/blob/master/build_offline_archive.lua#L75-76
+
+The script will run fine without luaposix, but it will only save the mapping at the very end, so if anything goes wrong you lose the mapping.

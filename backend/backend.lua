@@ -5,6 +5,15 @@ local util = require 'utils.utils'
 local archive = require 'utils.archive'
 local HTTPClient = require 'http.client'
 
+---@class Subtitle
+---@field is_downloaded boolean indicates if this was downloaded already, always true for offline backend
+---@field is_archive boolean indicates if this is an archive file, to be downloaded extracted
+---@field matching_episode boolean indicates if this sub is for the currently playing file
+---@field name string name of the subtitle
+---@field absolute_path string path in the cache where the sub is stored
+---@field last_modified number seconds since UNIX epoch, not used for offline backend
+
+---@class Backend
 local backend = {
     archive_extensions = { ["RAR"] = 1, ["ZIP"] = 1, ["7Z"] = 1 },
 }
@@ -80,7 +89,7 @@ end
 
 ---Extract all subtitles which are available for the given ID
 ---@param show_info table containing parsed_title, ep_number and anilist_data
----@return string path to directory containing all matching subs
+---@return Subtitle[] list of subs for the given show
 function backend:query_subtitles(show_info)
     assert(false, "This should be implemented in a specific backend!")
 end
@@ -136,7 +145,7 @@ function backend:extract_archive(file, show_info)
                 name = f,
                 absolute_path = cached_path .. '/' .. f,
                 matching_episode = self:is_matching_episode(show_info, f),
-                _initialized = true
+                is_downloaded = true
             })
         end
     end

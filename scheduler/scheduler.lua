@@ -30,7 +30,7 @@ end
 function Scheduler:assign_thread(routine)
     for _,thread in ipairs(self.threads) do
         if thread:assign(routine) then
-            print(("Assigned routine %s to thread %s"):format(tostring(routine), tostring(thread)))
+            --print(("Assigned routine %s to thread %s"):format(tostring(routine), tostring(thread)))
             return thread
         end
     end
@@ -48,8 +48,14 @@ function Scheduler:poll()
     for i=#self.routines, 1, -1 do
         local finished_result = self.routines[i]:run()
         if finished_result then
-            table.insert(finished_results, finished_result)
-            table.remove(self.routines, i)
+            local cb_res, err = self.routines[i].on_complete_cb(finished_result)
+            assert(type(cb_res) == "boolean", ("%s did not return boolean in on_complete_cb() (got %s=%s)"):format(tostring(self), type(cb_res), tostring(cb_res)))
+            if cb_res then
+                table.insert(finished_results, finished_result)
+                table.remove(self.routines, i)
+            else
+                print(err)
+            end
             if self:is_rate_limited(finished_result.headers) then break end
         end
     end
@@ -69,7 +75,7 @@ function Scheduler:is_rate_limited(headers)
     local requests_left = (tonumber(headers['x-ratelimit-remaining']) or #self.threads+2) - #self.threads
     local reset_time    = headers['x-ratelimit-reset']
     local reset_offset  = headers['x-ratelimit-reset-after']
-    print(("current_time: %f, reqs left: %d, reset time: %d, reset_offset: %d"):format(current_time, requests_left or -1, reset_time or -1, reset_offset or -1))
+    -- print(("current_time: %f, reqs left: %d, reset time: %d, reset_offset: %d"):format(current_time, requests_left or -1, reset_time or -1, reset_offset or -1))
     if requests_left <= 1 then
         if reset_offset then
             self:set_timeout((self.timeout_reset or current_time) + tonumber(reset_offset))
