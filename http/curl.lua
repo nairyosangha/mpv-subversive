@@ -15,7 +15,7 @@ local CURL = {
 
 ---@return Scheduler scheduler
 function CURL:get_scheduler(host, port)
-    local key = host..':'..port
+    local key = host .. ':' .. port
     if not self.schedulers[key] then
         self.schedulers[key] = scheduler.new {
             carrier = "curl",
@@ -31,11 +31,11 @@ end
 ---@return string[]
 function CURL:build_curl_cmd(request, method)
     local request_headers = { ["Host"] = request.host }
-    for k,v in pairs(self.default_headers) do request_headers[k] = v end
-    for k,v in pairs(request.headers) do request_headers[k] = v end
+    for k, v in pairs(self.default_headers) do request_headers[k] = v end
+    for k, v in pairs(request.headers) do request_headers[k] = v end
     local curl_args = {}
     local function add_args(...)
-        for _,arg in ipairs({...}) do table.insert(curl_args, arg) end
+        for _, arg in ipairs({ ... }) do table.insert(curl_args, arg) end
     end
     local function add_header(k, v) add_args("--header", ("%s: %s"):format(k, v)) end
     add_args("curl", "-i")
@@ -43,7 +43,7 @@ function CURL:build_curl_cmd(request, method)
     if method == "POST" then
         add_args("--data", (assert(request.body, "Missing data for POST request")))
     end
-    for k,v in pairs(request_headers) do add_header(k, v) end
+    for k, v in pairs(request_headers) do add_header(k, v) end
     add_args(request.url)
     print(table.concat(curl_args, " "))
     return curl_args

@@ -44,29 +44,30 @@ function HTTPClient:unpack_url(request)
     request.url = request.url .. (query_params or "")
     request.host = host
     request.port = port
-    request.path = #path > 0 and path  .. query_params or "/"
+    request.path = #path > 0 and path .. query_params or "/"
     return request
 end
 
 ---@param response string raw HTTP response
 ---@return Response result containing parsed HTTP resonse
 function HTTPClient:parse_response(response)
-    local state = 1 -- 1:header, 2:data
+    local state = 1                        -- 1:header, 2:data
     local chunk_size, chunk_data = nil, "" -- only used when we're dealing with chunks
     local response_headers, data = {}, nil
     local function print_headers()
         local header_str = {}
-        for k,v in pairs(response_headers) do
-            header_str[#header_str+1] = ("%s=\"%s\""):format(k, v)
+        for k, v in pairs(response_headers) do
+            header_str[#header_str + 1] = ("%s=\"%s\""):format(k, v)
         end
         return table.concat(header_str, "\n\t - ")
     end
     local _, e, status_code, status_reason = response:find("^HTTP/[.1-3]+ (%d+)%s?([%s%w]*)\r?\n")
-    assert(type(e) == "number", ("Could not parse HTTP header from response: \"%s\""):format(({response:find("^(.+)\r?\n")})[3] or response))
+    assert(type(e) == "number",
+        ("Could not parse HTTP header from response: \"%s\""):format(({ response:find("^(.+)\r?\n") })[3] or response))
     local init_idx = e + 1
     while not data do
         local start_idx, end_idx = response:find("(\r?\n)", init_idx)
-        local line = response:sub(init_idx, start_idx and start_idx-1 or #response)
+        local line = response:sub(init_idx, start_idx and start_idx - 1 or #response)
         if #line == 0 and state == 1 then
             state = 2
         elseif state == 1 then
@@ -89,10 +90,11 @@ function HTTPClient:parse_response(response)
                     end
                 end
             else
-                error(("Unable to parse response. headers: \n\t - [ %s ],\n remaining response data:\n \"%s\""):format(print_headers(), response:sub(init_idx, #response)))
+                error(("Unable to parse response. headers: \n\t - [ %s ],\n remaining response data:\n \"%s\""):format(
+                    print_headers(), response:sub(init_idx, #response)))
             end
         end
-        init_idx = end_idx and end_idx +1 or #response
+        init_idx = end_idx and end_idx + 1 or #response
     end
     return {
         data = data,
@@ -111,7 +113,7 @@ end
 
 function HTTPClient:get_query_params(request)
     local encoded_params = {}
-    for k,v in pairs(request.params or {}) do
+    for k, v in pairs(request.params or {}) do
         table.insert(encoded_params, ("%s=%s"):format(k, self.escape(v)))
     end
     return #encoded_params > 0 and '?' .. table.concat(encoded_params, '&') or ""
@@ -137,7 +139,11 @@ end
 function HTTPClient:sync_save(request)
     local result_if_ok, err_msg = self:validate(self:sync_GET(request), "GET")
     if result_if_ok then
-        return assert(utils.open_file(assert(request.path_to_file, "Missing path to file!"), 'wb', function(f) f:write(result_if_ok.data); return true end), ("Could not open path to file: %q"):format(request.path_to_file))
+        return assert(
+            utils.open_file(assert(request.path_to_file, "Missing path to file!"), 'wb',
+                function(f)
+                    f:write(result_if_ok.data); return true
+                end), ("Could not open path to file: %q"):format(request.path_to_file))
     end
     return result_if_ok, err_msg
 end
@@ -152,7 +158,11 @@ function HTTPClient:async_save(request)
             if not result_if_ok then
                 return false, err_msg
             end
-            return assert(utils.open_file(assert(request.path_to_file, "Missing path to file!"), 'wb', function(f) f:write(result.data); return true end), ("Could not open path to file: %q"):format(request.path_to_file))
+            return assert(
+                utils.open_file(assert(request.path_to_file, "Missing path to file!"), 'wb',
+                    function(f)
+                        f:write(result.data); return true
+                    end), ("Could not open path to file: %q"):format(request.path_to_file))
         end)
 end
 
