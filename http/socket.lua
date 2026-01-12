@@ -26,13 +26,13 @@ local SOCKET = {
         protocol = "tlsv1_3",
         verify = "none",
         cafile = "/etc/ssl/certs/ca-certificates.crt",
-        options = {"all", "no_sslv2", "no_sslv3", "no_tlsv1" }
+        options = { "all", "no_sslv2", "no_sslv3", "no_tlsv1" }
     },
 }
 
 ---@return Scheduler scheduler
 function SOCKET:get_scheduler(host, port)
-    local key = host..':'..port
+    local key = host .. ':' .. port
     if not self.schedulers[key] then
         self.schedulers[key] = scheduler.new {
             carrier = "socket",
@@ -40,7 +40,7 @@ function SOCKET:get_scheduler(host, port)
             port = port,
             thread_count = 3,
             init_thread_func = function(th)
-                -- set timout to 0, to make it so the receive call returns immediately, 
+                -- set timeout to 0, to make it so the receive call returns immediately,
                 -- instead of blocking, this means we can get a timeout ('wantread')
                 th.sock = self:create_socket(host, port, 0)
             end
@@ -70,15 +70,15 @@ end
 ---@return string HTTP_message
 function SOCKET:build_request(request, method, default_headers)
     local request_headers = { ["Host"] = request.host }
-    for k,v in pairs(default_headers) do request.headers[k] = v end
-    for k,v in pairs(request.headers) do request_headers[k] = v end
+    for k, v in pairs(default_headers) do request.headers[k] = v end
+    for k, v in pairs(request.headers) do request_headers[k] = v end
     if method == "POST" then
         request_headers["Content-Type"] = "application/json"
         request_headers["Content-Length"] = #request.body
     end
     local request_table = {}
     table.insert(request_table, ("%s %s HTTP/1.1\r\n"):format(method, request.path))
-    for k,v in pairs(request_headers) do
+    for k, v in pairs(request_headers) do
         table.insert(request_table, ("%s: %s\r\n"):format(headers.canonic[k] or k, v))
     end
     table.insert(request_table, "\r\n")
@@ -95,9 +95,9 @@ function SOCKET:sync_GET(request)
     local client_socket = self:create_socket(request.host, request.port, nil)
     local http_get_body = self:build_request(request, "GET", self.sync_default_headers)
     local send_res, send_err = client_socket:send(http_get_body)
-    assert(send_res, ("Error while sending data to socket: %s"):format(send_err))
+    assert(send_res, ("Error while sending data to socket: %s"):format(send_err or ""))
     local recv_res, recv_err = client_socket:receive("*a")
-    assert(recv_res, ("Error while sending data to socket: %s"):format(recv_err))
+    assert(recv_res, ("Error while sending data to socket: %s"):format(recv_err or ""))
     local response = self:parse_response(recv_res)
     client_socket:close()
     return response
@@ -108,8 +108,9 @@ end
 function SOCKET:async_GET(request)
     request = self:unpack_url(request)
     local init_func = function(routine)
-        local send_res, send_err = routine.thread.sock:send(self:build_request(request, "GET", self.async_default_headers))
-        assert(send_res, ("Error while sending data to socket: %s"):format(send_err))
+        local send_res, send_err = routine.thread.sock:send(self:build_request(request, "GET", self
+            .async_default_headers))
+        assert(send_res, ("Error while sending data to socket: %s"):format(send_err or ""))
         local parser, status_parser, header_parser, response_parser
         local partials = {}
 
@@ -193,9 +194,9 @@ function SOCKET:POST(request)
     request = self:unpack_url(request)
     local client_socket = self:create_socket(request.host, request.port, nil)
     local send_res, send_err = client_socket:send(self:build_request(request, "POST", self.sync_default_headers))
-    assert(send_res, ("Error while sending data to socket: %s"):format(send_err))
+    assert(send_res, ("Error while sending data to socket: %s"):format(send_err or ""))
     local recv_res, recv_err = client_socket:receive("*a")
-    assert(recv_res, ("Error while sending data to socket: %s"):format(recv_err))
+    assert(recv_res, ("Error while sending data to socket: %s"):format(recv_err or ""))
     local response = self:parse_response(recv_res)
     client_socket:close()
     return response

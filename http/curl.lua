@@ -59,7 +59,7 @@ function CURL:sync_GET(request)
         capture_stderr = true,
         args = CURL:build_curl_cmd(request, "GET")
     })
-    assert(result, ("Could not complete curl command! %s"):format(error))
+    assert(result, ("Could not complete curl command! %s"):format(error or ""))
     local response = self:parse_response(result.stdout)
     return response
 end
@@ -75,7 +75,7 @@ function CURL:async_GET(request)
             capture_stderr = true,
             args = CURL:build_curl_cmd(request, "GET")
         }, function(success, result, error)
-            assert(success, ("Could not complete curl command! %s"):format(error))
+            assert(success, ("Could not complete curl command! %s"):format(error or ""))
             routine.callback_result = self:parse_response(result.stdout)
             coroutine.resume(routine.co) -- this should end the coroutine
         end)
