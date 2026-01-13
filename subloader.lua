@@ -98,8 +98,8 @@ function show_selector:cache_lookup(anilist_data)
         return
     end
     local dir, _ = mpu.split_path(mp.get_property("path"))
-    local normalized_dir = mp.command_native({"normalize-path", dir })
-    for _,media_blacklist_dir in pairs(self.backend.media_blacklist) do
+    local normalized_dir = mp.command_native({ "normalize-path", dir })
+    for _, media_blacklist_dir in pairs(self.backend.media_blacklist) do
         if normalized_dir == media_blacklist_dir then
             return
         end
@@ -116,10 +116,11 @@ function show_selector:display(show_list)
     -- only show at most 10 entries, if there are more we probably parsed the show name wrong, plus the list wouldn't render right anyway
     self.show_list = show_list and show_list or util.table_slice(self.backend:query_shows(self.show_info), 1, 11)
     self:clear_choices()
-    self:set_header(([[Looking for: %s, episode: %s]]):format(self.show_info.parsed_title, self.show_info.ep_number or 'N/A'))
+    self:set_header(([[Looking for: %s, episode: %s]]):format(self.show_info.parsed_title,
+        self.show_info.ep_number or 'N/A'))
     self.modify_episode_item.on_chosen_cb = function() self:build_manual_episode_console() end
 
-    for _,s in ipairs(self.show_list) do
+    for _, s in ipairs(self.show_list) do
         self:add_item {
             display_text = build_menu_entry(s),
             on_chosen_cb = function(item)
@@ -163,8 +164,8 @@ function sub_selector:query(show_info)
     self.subtitles = {}
     self.show_info = show_info
     local function extract_archive(path_to_archive)
-        local _,files_in_archive = self.backend:extract_archive(path_to_archive, show_info)
-        for _,f in ipairs(files_in_archive) do
+        local _, files_in_archive = self.backend:extract_archive(path_to_archive, show_info)
+        for _, f in ipairs(files_in_archive) do
             table.insert(self.subtitles, f)
         end
         return files_in_archive
@@ -178,7 +179,7 @@ function sub_selector:query(show_info)
         if sub.is_archive then
             local archive_name = self.backend:get_cached_path(show_info) .. sub.name
             if sub.is_downloaded then
-                for _,s in ipairs(util.copy_table(self:get_cache().archives[sub.name])) do
+                for _, s in ipairs(util.copy_table(self:get_cache().archives[sub.name])) do
                     s.matching_episode = self.backend:is_matching_episode(show_info, s.name)
                     table.insert(self.subtitles, s)
                 end
@@ -197,7 +198,7 @@ function sub_selector:query(show_info)
         end
     end
     local function display_sorted_subs()
-        table.sort(self.subtitles, function(a,b) return a.name < b.name end)
+        table.sort(self.subtitles, function(a, b) return a.name < b.name end)
         self:display()
     end
     if archive_cnt == 0 then
@@ -244,12 +245,11 @@ end
 function sub_selector:cache_archive(archive, files_in_archive)
     files_in_archive = util.copy_table(files_in_archive)
     self:cache_subtitle(archive)
-    for _,f in ipairs(files_in_archive) do
+    for _, f in ipairs(files_in_archive) do
         f.matching_episode = nil
     end
     self:get_cache().archives[archive.name] = files_in_archive
 end
-
 
 function sub_selector:select_item(menu_item)
     if not menu_item.subtitle.is_downloaded then
@@ -347,7 +347,7 @@ end
 function loader:run(backend)
     mp.osd_message("Running mpv-subversive", 1)
     local dir, fn = mpu.split_path(mp.get_property("path"))
-    local normalized_dir = mp.command_native({"normalize-path", dir })
+    local normalized_dir = mp.command_native({ "normalize-path", dir })
     local show_name, episode = backend:parse_current_file(fn)
     local initial_show_info = {
         parsed_title = show_name,
@@ -358,7 +358,7 @@ function loader:run(backend)
     sub_selector:init(backend)
 
     -- look for .anilist.id file to skip the jimaku lookup
-    local saved_id = util.open_file(normalized_dir..'/'..self.ID_FILE, 'r', function(f) return f:read("*l") end)
+    local saved_id = util.open_file(normalized_dir .. '/' .. self.ID_FILE, 'r', function(f) return f:read("*l") end)
     if saved_id then
         initial_show_info.anilist_data = { id = tonumber(saved_id) }
         return sub_selector:query(initial_show_info)

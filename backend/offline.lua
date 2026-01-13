@@ -21,10 +21,10 @@ function offline:query_subtitles(show_info)
                 end
                 assert(util.path_exists(path), ("Path in mapping was invalid: '%q'"):format(path))
                 path = path .. '/' -- makes sure we error out if this isn't a directory
-                for _,file in ipairs(util.run_cmd(("ls %q"):format(path))) do
+                for _, file in ipairs(util.run_cmd(("ls %q"):format(path))) do
                     if self:is_supported_archive(file) then
-                        local _,files_in_archive = self:extract_archive(path .. file, show_info)
-                        for _,ff in ipairs(files_in_archive) do
+                        local _, files_in_archive = self:extract_archive(path .. file, show_info)
+                        for _, ff in ipairs(files_in_archive) do
                             ff.last_modified = 1
                             table.insert(subtitles, ff)
                         end
