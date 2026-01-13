@@ -56,7 +56,7 @@ function Routine:run()
     end
 
     self:unassign()
-    print(("Finished running routine %s"):format(self))
+    print(("Finished running routine %s"):format(tostring(self)))
     return result
 end
 
