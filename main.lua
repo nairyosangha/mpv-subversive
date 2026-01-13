@@ -23,7 +23,7 @@ OPTS = {
     -- the following options are used when using the 'jimaku' backend
     API_TOKEN = "",
 }
-options.read_options(OPTS, 'sub_loader')
+options.read_options(OPTS, 'mpv-subversive')
 local backend
 
 local function main()
