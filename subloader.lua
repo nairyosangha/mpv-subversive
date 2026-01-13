@@ -185,7 +185,10 @@ function sub_selector:query(show_info)
         return files_in_archive
     end
     local archive_cnt, completed_archive_cnt = 0, 0
-    for _,sub in ipairs(self.backend:query_subtitles(show_info)) do
+    local queried_subtitles = self.backend:query_subtitles(show_info)
+    local err = queried_subtitles['error']
+    if err then return mp.osd_message(("Failed to query subtitles: %s"):format(err), 3) end
+    for _, sub in ipairs(queried_subtitles) do
         if self:is_cached(sub) then sub.is_downloaded = true end
         if sub.is_archive then
             local archive_name = self.backend:get_cached_path(show_info) .. sub.name

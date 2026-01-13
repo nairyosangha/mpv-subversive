@@ -7,7 +7,9 @@ local offline = {}
 
 function offline:query_subtitles(show_info)
     print(("found ID: %s, looking for matches in %q"):format(show_info.anilist_data.id, self.subtitle_mapping))
-    assert(util.path_exists(self.subtitle_mapping), ("Could not find mapping file '%q'"):format(self.subtitle_mapping))
+    if not util.path_exists(self.subtitle_mapping) then
+        return { error = ("Could not find mapping file '%q'"):format(self.subtitle_mapping) }
+    end
     local mapping_dir, _ = mpu.split_path(self.subtitle_mapping)
     local subtitles = {}
     util.open_file(self.subtitle_mapping, 'r', function(f)

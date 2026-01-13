@@ -13,8 +13,11 @@ end
 
 ---Extract all subtitles which are available for the given ID
 ---@param show_info table containing title, ep_number and anilist_data
----@return table containing all subtitles for the given show
+---@return table containing all subtitles for the given show, with optional error field if something went wrong
 function jimaku:query_subtitles(show_info)
+    if not self.API_TOKEN or self.API_TOKEN == "" then
+        return { error = "no API_TOKEN available! Cannot do lookup." }
+    end
     local anilist_id = show_info.anilist_data.id
     mp.osd_message(("Finding matching subtitles for AniList ID '%s'"):format(anilist_id), 3)
     -- we don't need this here, but this takes a sec to load, and it feels better to do it here
@@ -24,6 +27,9 @@ function jimaku:query_subtitles(show_info)
         params = { anilist_id = anilist_id },
         headers = { ["Authorization"] = self.API_TOKEN }
     }
+    if response.status_code ~= 200 then
+        return { error = ("Unexpected return code: %d: %s"):format(response.status_code, response.data) }
+    end
     local entries, err = mpu.parse_json(response.data)
     assert(entries, err)
     local cached_path = self:get_cached_path(show_info)
