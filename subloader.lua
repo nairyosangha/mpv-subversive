@@ -42,45 +42,30 @@ function show_selector:build_manual_lookup_console()
         mpi.log("Manual lookup requested, Please start typing the name of the show.")
         mpi.log("When the correct entry pops up on screen, select it with TAB, and press ENTER.")
     end
-    local matching_shows = {}           -- contains data as received from AniList
-    local displayed_shows = {}          -- contains only text rendered on screen
-    local cur_idx, last_idx = 0, nil    -- used to highlight the currenctly selected entry
-    local last_lookup_time = os.time()  -- used to debounce requests so we don't spam the AniList API
+    local matching_shows = {}          -- contains data as received from AniList
+    local displayed_shows = {}         -- contains only text rendered on screen
+    local last_lookup_time = os.time() -- used to debounce requests so we don't spam the AniList API
     mpi.get {
         prompt = "Please type the name of the show: ",
         opened = log_help,
-        submit = function(_)
-            if cur_idx == 0 then
+        submit = function(selected_show)
+            if not matching_shows[selected_show] then
                 mpi.log_error("No show was selected!")
                 return log_help()
             end
             mpi.terminate()
-            local anilist_data = matching_shows[cur_idx]
+            local anilist_data = matching_shows[selected_show]
             self.show_list = { anilist_data }
             self.show_info.anilist_data = anilist_data
-            self.show_info.parsed_title = anilist_data.title and anilist_data.title.romaji or self.show_info.parsed_title
+            self.show_info.parsed_title = anilist_data.title and anilist_data.title.romaji or self.show_info
+                .parsed_title
             self:cache_lookup(anilist_data)
             sub_selector:query(self.show_info)
         end,
         -- we are kinda abusing the complete function here, we never actually complete the text
         -- we just update the displayed log messages so the user can pick a show there
-        complete = function(user_text)
-            cur_idx = cur_idx + 1
-            if cur_idx > #matching_shows then
-                cur_idx = 1
-            end
-            local current_show = displayed_shows[cur_idx]
-            displayed_shows[cur_idx] = {
-                text = current_show,
-                style = "{\\c&H7a77f2&}",
-                terminal_style = "\027[31m",
-            }
-            if last_idx then
-                displayed_shows[last_idx] = displayed_shows[last_idx].text
-            end
-            last_idx = cur_idx
-            mpi.set_log(displayed_shows)
-            return { user_text }, 1
+        complete = function(_)
+            return displayed_shows, 1
         end,
         edited = function(user_text)
             local current_time = os.time()
@@ -88,7 +73,7 @@ function show_selector:build_manual_lookup_console()
                 last_lookup_time = current_time
                 matching_shows = self.backend:query_shows { parsed_title = user_text }
                 displayed_shows = Sequence(matching_shows):map(build_menu_entry):collect()
-                mpi.set_log(displayed_shows)
+                for idx, show in ipairs(displayed_shows) do matching_shows[show] = matching_shows[idx] end
             end
         end
     }
